@@ -26,4 +26,9 @@ public class Host {
     public String getHostname() {
         return hostname;
     }
+
+    @Override
+    public String toString() {
+        return hostname+":"+port.toString();
+    }
 }
