@@ -1,9 +1,5 @@
 package com.ezshare.message;
 
-import org.apache.commons.cli.*;
-import java.net.URI;
-import java.net.URISyntaxException;
-
 /**
  * Encapsulation of Query Message.
  * Created by jason on 10/4/17.
@@ -17,16 +13,16 @@ public class ResourceTemplate {
     private final String owner;
     private final String ezserver;
 
-    public ResourceTemplate(CommandLine line) throws URISyntaxException {
-        this.channel = line.getOptionValue("channel","");
-        this.name = line.getOptionValue("name","");
-        this.tags = (line.hasOption("tags"))?line.getOptionValue("tags").split(","):null;
-        this.description = line.getOptionValue("description","");
-        //URI check
-        this.uri = (line.hasOption("uri"))?new URI(line.getOptionValue("uri")).toString():"";
-        this.owner = line.getOptionValue("owner","");
-        this.ezserver = line.getOptionValue("ezserver","");
+    public ResourceTemplate(String channel, String name, String[] tags,String description, String uri,String owner,String ezserver){
+        this.channel = channel;
+        this.name = name;
+        this.tags = tags;
+        this.description = description;
+        this.uri = uri;
+        this.owner = owner;
+        this.ezserver = ezserver;
     }
+
 
     public String getChannel() {
         return channel;
