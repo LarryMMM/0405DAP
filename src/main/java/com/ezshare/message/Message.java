@@ -4,7 +4,7 @@ package com.ezshare.message;
  * Base Class of All Messages
  * Created by jason on 10/4/17.
  */
-public class Message {
+public abstract class Message {
 
     private final String command;
 
@@ -15,4 +15,7 @@ public class Message {
     public String getCommand() {
         return command;
     }
+
+    public abstract String validator();
+
 }

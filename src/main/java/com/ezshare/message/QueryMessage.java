@@ -1,7 +1,7 @@
 package com.ezshare.message;
 
 /**
- * Message type for query commands.
+ * Encapsulation of Query Command.
  * Created by jason on 9/4/17.
  */
 public class QueryMessage extends Message {
@@ -22,5 +22,10 @@ public class QueryMessage extends Message {
 
     public boolean isRelay() {
         return relay;
+    }
+
+    @Override
+    public String validator() {
+        return null;
     }
 }

@@ -1,5 +1,10 @@
 package com.ezshare.message;
 
+import com.google.gson.Gson;
+
+import java.net.URI;
+import java.net.URISyntaxException;
+
 /**
  * Encapsulation of Query Message.
  * Created by jason on 10/4/17.
@@ -13,7 +18,7 @@ public class ResourceTemplate {
     private final String owner;
     private final String ezserver;
 
-    public ResourceTemplate(String channel, String name, String[] tags,String description, String uri,String owner,String ezserver){
+    public ResourceTemplate(String channel, String name, String[] tags,String description, String uri,String owner,String ezserver) throws URISyntaxException{
         this.channel = channel;
         this.name = name;
         this.tags = tags;
@@ -54,6 +59,6 @@ public class ResourceTemplate {
 
     @Override
     public String toString() {
-        return name;
+        return new Gson().toJson(this);
     }
 }
