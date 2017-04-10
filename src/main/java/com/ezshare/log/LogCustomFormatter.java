@@ -11,7 +11,7 @@ import java.util.logging.*;
 public class LogCustomFormatter {
 
     //create a logger for current class
-    public Logger getLogger(String classname){
+    public static Logger getLogger(String classname){
 
         Logger logger = Logger.getLogger(classname);
         logger.setUseParentHandlers(false);
