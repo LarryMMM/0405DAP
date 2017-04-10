@@ -16,18 +16,34 @@ public class FileList {
     private List<File> fileList = new ArrayList<>();
 
     public void add() {
-
+        /*
+        
+            TO-DO!
+        
+         */
     }
 
     public void remove() {
-
+        /*
+        
+            TO-DO!
+        
+         */
     }
 
     public void update() {
-
+        /*
+        
+            TO-DO!
+        
+         */
     }
 
     public void query() {
-
+        /*
+        
+            TO-DO!
+        
+         */
     }
 }

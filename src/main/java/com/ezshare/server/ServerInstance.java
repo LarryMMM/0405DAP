@@ -18,6 +18,7 @@ public class ServerInstance {
     private static final int MAX_THREAD_COUNT = 10;
 
     private static FileList fileList = new FileList();
+    private static ServerList serverList = new ServerList();
     
     /*
         Currently it is a simple fixed-volume thread pool.
@@ -26,6 +27,12 @@ public class ServerInstance {
     private static ExecutorService threadPool = Executors.newFixedThreadPool(MAX_THREAD_COUNT);
 
     public static void main(String[] args) {
+        /*
+        
+            Timer & Active ServerList Exchange Sending...
+            TO-DO!
+        
+         */
         ServerSocketFactory factory = ServerSocketFactory.getDefault();
         try (ServerSocket server = factory.createServerSocket(PORT)) {
             System.out.println("ServerSocket initialized.");
@@ -36,7 +43,7 @@ public class ServerInstance {
                 Socket client = server.accept();
                 
                 /* Assign a worker thread for this socket. */
-                threadPool.submit(new WorkerThread(client, fileList));
+                threadPool.submit(new WorkerThread(client, fileList, serverList));
             }
         } catch (IOException e) {
             e.printStackTrace();
