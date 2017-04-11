@@ -14,9 +14,9 @@ public class FileTemplate extends ResourceTemplate {
      */
     private final int resourceSize;
 
-    public FileTemplate(String channel, String name, String[] tags, String description, String uri, String owner, String ezserver) throws URISyntaxException {
+    public FileTemplate(String channel, String name, String[] tags, String description, String uri, String owner, String ezserver,int resourceSize) throws URISyntaxException {
         super(channel, name, tags, description, uri, owner, ezserver);
-        this.resourceSize = 0;
+        this.resourceSize = resourceSize;
     }
 
     public int getResourceSize() {

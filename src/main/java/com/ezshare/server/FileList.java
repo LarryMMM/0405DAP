@@ -1,6 +1,6 @@
 package com.ezshare.server;
 
-import com.ezshare.message.File;
+import com.ezshare.message.FileTemplate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -13,7 +13,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public class FileList {
 
     private ReadWriteLock rwl = new ReentrantReadWriteLock();
-    private List<File> fileList = new ArrayList<>();
+    private List<FileTemplate> fileTemplateList = new ArrayList<>();
 
     public void add() {
         /*
