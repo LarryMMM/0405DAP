@@ -10,19 +10,24 @@ import java.util.List;
 public class ServerList {
     private List<Host> serverList;
     
-    public synchronized void query() {
-        /*
-        
-            TO-DO!
-        
-         */        
+    public synchronized List<Host> getServerList() {
+        return serverList;
+    }
+            
+    public synchronized void updateServerList(List<Host> inputServerList) {
+        for (Host inputHost : inputServerList) {
+            if (!containsHost(inputHost)) {
+                serverList.add(inputHost);
+            }
+        }
     }
     
-    public synchronized void update(List<Host> serverList) {
-        /*
-        
-            TO-DO!
-        
-         */        
+    private synchronized boolean containsHost(Host inputHost) {
+        for (Host host : serverList) {
+            if (host.getHostname().equals(inputHost.getHostname()) && host.getPort().equals(inputHost.getPort())) {
+                return true;
+            }
+        }
+        return false;
     }
 }
