@@ -9,7 +9,6 @@ import com.google.gson.Gson;
 import org.apache.commons.cli.*;
 
 import java.net.Socket;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -91,7 +90,6 @@ public class Client {
      * Construct ResourceTemplate object from command line args.
      * @param line command line args.
      * @return ResourceTemplate object.
-     * @throws URISyntaxException When uri invalid.
      */
     private static ResourceTemplate getResourceTemplate(CommandLine line){
         //parse commandline args to ResourceTemplate object
@@ -504,7 +502,7 @@ public class Client {
 
             if(line.hasOption("share")){
                 if(!line.hasOption("uri")||!line.hasOption("secret")){
-                    error_message = "URI or secret missing.";;}
+                    error_message = "URI or secret missing.";}
                 else
                     shareCommand(socket,line.getOptionValue("secret"),resourceTemplate);}
 
