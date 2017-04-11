@@ -1,16 +1,18 @@
 package com.ezshare;
 
+import java.io.*;
+
 import com.ezshare.message.*;
 import com.ezshare.log.*;
+import com.ezshare.message.FileTemplate;
 import com.google.gson.Gson;
 import org.apache.commons.cli.*;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
 import java.net.Socket;
-import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.logging.Logger;
 
 
@@ -20,6 +22,7 @@ import java.util.logging.Logger;
  */
 public class Client {
 
+    private static final String download_path = "Downloads/";
     private static final Logger logger = LogCustomFormatter.getLogger(Client.class.getName());
     private static final Gson gson = new Gson();
     private static boolean debug;
@@ -61,6 +64,7 @@ public class Client {
      * @return validation of the command line args.
      */
     private static boolean optionsValidator(CommandLine line){
+        //make sure only one command option appears in commandline args
         int count = 0;
         if(line.hasOption("query"))count++;
         if(line.hasOption("publish"))count++;
@@ -68,7 +72,6 @@ public class Client {
         if(line.hasOption("exchange"))count++;
         if(line.hasOption("remove"))count++;
         if(line.hasOption("fetch"))count++;
-
         return count==1;
     }
 
@@ -78,6 +81,7 @@ public class Client {
      * @return Host object
      */
     private static Host getHost(CommandLine line){
+        //parse commandline args to Host object
         String hostname = line.hasOption("host")?line.getOptionValue("host",""):"localhost";
         Integer port = line.hasOption("port")?Integer.valueOf(line.getOptionValue("port","")):3780;
         return new Host(hostname,port);
@@ -89,13 +93,13 @@ public class Client {
      * @return ResourceTemplate object.
      * @throws URISyntaxException When uri invalid.
      */
-    private static ResourceTemplate getResourceTemplate(CommandLine line) throws URISyntaxException{
+    private static ResourceTemplate getResourceTemplate(CommandLine line){
+        //parse commandline args to ResourceTemplate object
         String channel = line.getOptionValue("channel","");
         String name = line.getOptionValue("name","");
         String[] tags = (line.hasOption("tags"))?line.getOptionValue("tags").split(","):null;
         String description = line.getOptionValue("description","");
-        //URI check
-        String uri = (line.hasOption("uri"))?new URI(line.getOptionValue("uri")).toString():"";
+        String uri = (line.hasOption("uri"))?line.getOptionValue("uri"):"";
         String owner = line.getOptionValue("owner","");
         String ezserver = line.getOptionValue("ezserver","");
 
@@ -108,7 +112,7 @@ public class Client {
      * @param output the output stream of the socket.
      * @param JSON  the json string to be sent.
      */
-    private static void sendMessage(DataOutputStream output, String JSON) throws IOException {
+    private static void sendMessage(DataOutputStream output, String JSON) throws IOException{
         //send message to server
         output.writeUTF(JSON);
         output.flush();
@@ -118,94 +122,417 @@ public class Client {
     }
 
     /**
-     * Process query command
-     * @param host host to query
-     * @param resourceTemplate The description of resource.
+     * Read simple response.
+     * @param input Input stream of the socket
+     * @return  The exact response of server or timeout info.
+     * @throws IOException  when connection failed.
      */
-    public static void queryCommand(Host host,ResourceTemplate resourceTemplate){
+    private static String readResponse(DataInputStream input) throws IOException{
+        //set timer
+        long t1 = System.currentTimeMillis();
 
-        String hostname = host.getHostname();
-        Integer port = host.getPort();
+        while (true){
 
-        try(Socket socket = new Socket(hostname,port)){
+            long t2 = System.currentTimeMillis();
+            if(input.available()>0){
+                return input.readUTF();
+            }
+            //set timeout
+            if (t2-t1>5000){
+                return "timeout";}
+        }
+    }
 
-            if(debug) logger.fine("querying to "+hostname+":"+port.toString());
+    /**
+     * Process query command.
+     * Can also be utilized in Server WorkerThread
+     * @param socket    The socket connected to target server.
+     * @param resourceTemplate  The encapsulation of the resource.
+     */
+    public static List<ResourceTemplate> queryCommand(Socket socket,ResourceTemplate resourceTemplate){
+
+        List<ResourceTemplate> result = new ArrayList<>();
+
+        try{
 
             DataInputStream input = new DataInputStream(socket.getInputStream());
             DataOutputStream output = new DataOutputStream(socket.getOutputStream());
+
+            if(debug) logger.fine("querying to "+socket.getRemoteSocketAddress());
 
             QueryMessage queryMessage = new QueryMessage(resourceTemplate,true);
 
             String JSON = gson.toJson(queryMessage);
             sendMessage(output,JSON);
 
-            long t1 = System.currentTimeMillis();
-            while (true){
+            String response = readResponse(input);
 
-                long t2 = System.currentTimeMillis();
-                if(input.available()>0){
-                    String response = input.readUTF();
+            //receive response
+            if(response.contains("success")){
+                //if success print resources
+                if(debug)   logger.fine("RECEIVE:"+response);
+                response = readResponse(input); //discard success message
+                while (!response.contains("resultSize")){
+                    //print out resources
+                    ResourceTemplate r = gson.fromJson(response,ResourceTemplate.class);
+                    result.add(r);
+                    System.out.println(response);
+                    response = readResponse(input);
+                }
+                //receive result size for successful request
+                if(debug)   logger.fine("RECEIVE_ALL:"+response);
+            }else if(response.contains("error")){
+                //when error occur
+                if(debug) logger.warning("RECEIVED:"+response);
+            }else if(response.contains("timeout")){
+                //when connection timeout
+                if (debug) logger.warning("CONNECTION TIMEOUT!");
+            }
 
-                    if(response.contains("success")){
-                        if (debug)logger.fine("RECEIVED:"+response);
-                        continue;
-                    }
-                    if(response.contains("error")){
-                        if (debug)logger.warning("RECEIVED"+response);
-                        break;
-                    }
-                    if (response.contains("resultSize")){
-                        if (debug)logger.fine("RECEIVED_ALL:"+response);
-                        break;}
 
-                    logger.info("RESOURCE:"+response);
+        } catch (IOException e){
+            if (debug) logger.warning("Connection Failure."+socket.getRemoteSocketAddress());
+        }finally {
+
+            //try to terminate connection no matter what happened
+            try {
+                socket.close();
+            }catch (IOException e){
+                if (debug) logger.warning("Unable to disconnect!");
+            }
+
+        }
+        return result;
+    }
+
+    /**
+     * Process publish command.
+     * @param socket    The socket connected to target server.
+     * @param resourceTemplate  The encapsulation of the resource.
+     */
+    private static void publishCommand(Socket socket,ResourceTemplate resourceTemplate){
+        try{
+
+            DataInputStream input = new DataInputStream(socket.getInputStream());
+            DataOutputStream output = new DataOutputStream(socket.getOutputStream());
+
+            if(debug) logger.fine("publishing to "+socket.getRemoteSocketAddress());
+
+            PublishMessage publishMessage = new PublishMessage(resourceTemplate);
+
+            String JSON = gson.toJson(publishMessage);
+            sendMessage(output,JSON);
+
+            String response = readResponse(input);
+
+            if(response.contains("error")&&debug)
+                logger.warning("RECEIVED:"+response);
+            if(response.contains("success")&&debug)
+                logger.fine("RECEIVED:"+response);
+            if(response.contains("timeout")&&debug)
+                logger.warning("CONNECTION TIMEOUT!");
+
+
+
+        } catch (IOException e){
+            if (debug) logger.warning("Unable to connect to "+socket.getRemoteSocketAddress());
+        } finally {
+            try {
+                socket.close();
+            }catch (IOException e){
+                if (debug) logger.warning("Unable to disconnect!");
+            }
+        }
+    }
+
+    /**
+     * Proceed share command
+     * @param secret    Secret of the server.
+     * @param socket    The socket connected to target server.
+     * @param resourceTemplate  The encapsulation of the resource.
+     */
+    private static void shareCommand(Socket socket,String secret,ResourceTemplate resourceTemplate){
+
+        try{
+
+            DataInputStream input = new DataInputStream(socket.getInputStream());
+            DataOutputStream output = new DataOutputStream(socket.getOutputStream());
+
+            if(debug) logger.fine("sharing to "+socket.getRemoteSocketAddress());
+
+            ShareMessage shareMessage = new ShareMessage(resourceTemplate,secret);
+
+            String JSON = gson.toJson(shareMessage);
+            sendMessage(output,JSON);
+
+            String response = readResponse(input);
+            if(response.contains("error")&&debug)
+                logger.warning("RECEIVED:"+response);
+            if(response.contains("success")&&debug)
+                logger.fine("RECEIVED:"+response);
+            if(response.contains("timeout")&&debug)
+                logger.warning("CONNECTION TIMEOUT!");
+
+
+        } catch (IOException e){
+            if (debug) logger.warning("Unable to connect to "+socket.getRemoteSocketAddress());
+        }finally {
+            try {
+                socket.close();
+            }catch (IOException e){
+                if (debug) logger.warning("Unable to disconnect!");
+            }
+        }
+    }
+
+    /**
+     *  Process remove command.
+     * @param socket    The socket connected to target server.
+     * @param resourceTemplate  The encapsulation of the resource.
+     */
+    private static void removeCommand(Socket socket,ResourceTemplate resourceTemplate){
+
+
+        try{
+
+            DataInputStream input = new DataInputStream(socket.getInputStream());
+            DataOutputStream output = new DataOutputStream(socket.getOutputStream());
+
+            if(debug) logger.fine("removing to "+socket.getRemoteSocketAddress());
+
+            RemoveMessage removeMessage = new RemoveMessage(resourceTemplate);
+
+            String JSON = gson.toJson(removeMessage);
+            sendMessage(output,JSON);
+
+            String response = readResponse(input);
+            if(response.contains("error")&&debug)
+                logger.warning("RECEIVED:"+response);
+            if(response.contains("success")&&debug)
+                logger.fine("RECEIVED:"+response);
+            if(response.contains("timeout")&&debug)
+                logger.warning("CONNECTION TIMEOUT!");
+
+
+        } catch (IOException e){
+            if (debug) logger.warning("Connection Failed"+socket.getRemoteSocketAddress());
+        }finally {
+            try {
+                socket.close();
+            }catch (IOException e){
+                if (debug) logger.warning("Unable to disconnect!");
+            }
+        }
+    }
+
+    /**
+     * Process exchange command.
+     * @param socket    The socket connected to target server.
+     * @param servers The servers in exchange request.
+     */
+    private static void exchangeCommand(Socket socket,String servers){
+
+        try{
+
+            DataInputStream input = new DataInputStream(socket.getInputStream());
+            DataOutputStream output = new DataOutputStream(socket.getOutputStream());
+
+            if(debug) logger.fine("exchanging to "+socket.getRemoteSocketAddress());
+
+            //parse commandline args to host list
+            String[] s = servers.split(",");
+            List<Host> serverList = new LinkedList<>();
+            for (String server:s) {
+                String[] address = server.split(":");
+                serverList.add(new Host(address[0],Integer.valueOf(address[1])));
+            }
+
+            ExchangeMessage exchangeMessage = new ExchangeMessage(serverList);
+
+            String JSON = gson.toJson(exchangeMessage);
+            sendMessage(output,JSON);
+
+            String response = readResponse(input);
+            if(response.contains("error")&&debug)
+                logger.warning("RECEIVED:"+response);
+            if(response.contains("success")&&debug)
+                logger.fine("RECEIVED:"+response);
+            if(response.contains("timeout")&&debug)
+                logger.warning("CONNECTION TIMEOUT!");
+
+
+
+        } catch (IOException e){
+            if (debug) logger.warning("Connection Failed"+socket.getRemoteSocketAddress());
+        } catch (ArrayIndexOutOfBoundsException | NumberFormatException e){
+            //when value of -servers option invalid
+            if (debug) logger.warning("Server address invalid.");
+        } finally {
+            try {
+                socket.close();
+            }catch (IOException e){
+                if (debug) logger.warning("Unable to disconnect!");
+            }
+        }
+    }
+
+    /**
+     * Process fetch command.
+     * @param socket    The socket connected to target server.
+     * @param resourceTemplate  The encapsulation of the resource.
+     */
+    private static void fetchCommand(Socket socket,ResourceTemplate resourceTemplate){
+
+
+        try{
+            DataInputStream input = new DataInputStream(socket.getInputStream());
+            DataOutputStream output = new DataOutputStream(socket.getOutputStream());
+
+            if(debug) logger.fine("fetching to "+socket.getRemoteSocketAddress());
+
+            FetchMessage fetchMessage = new FetchMessage(resourceTemplate);
+
+            String JSON = gson.toJson(fetchMessage);
+            sendMessage(output,JSON);
+
+            String response = readResponse(input);
+            if(response.contains("success")){
+
+                if(debug)logger.fine("RECEIVED:"+response);
+                //try to read file template
+                String file_template = readResponse(input);
+
+                if(debug) logger.fine("RECEIVE:"+file_template);
+                //if result size is 0
+                if (response.contains("resultSize")){
+                    if(debug)logger.warning("RECEIVED:"+response);
+                }
+                else {
+                //result exist! parse resource template
+                FileTemplate receivedFileTemplate = gson.fromJson(file_template,FileTemplate.class);
+
+                int resource_size = receivedFileTemplate.getResourceSize();
+
+                byte[] download = new byte[resource_size];
+
+
+                String name = new File(receivedFileTemplate.getUri()).getName();
+                //System.out.println(name);
+
+                //check download directory
+                File download_directory = new File(download_path);
+                if (!download_directory.exists())
+                    download_directory.mkdir();
+
+                //create file
+                FileOutputStream fileOutputStream = new FileOutputStream(download_path+name);
+
+                //read exact all file bytes from server
+                input.readFully(download);
+
+                //write file
+                fileOutputStream.write(download);
+
+                fileOutputStream.close();
+
+                //read resourceSize
+                response = readResponse(input);
+                logger.fine("RECEIVED:"+response);
 
                 }
 
-
-                if (t2-t1>5000)
-                    break;
             }
-            socket.close();
-
         } catch (IOException e){
-            if (debug) logger.warning("Unable to connect to "+host.toString());
+            if (debug) logger.warning("Connection Failed "+socket.getRemoteSocketAddress());
+            e.printStackTrace();
+        } finally {
+            try {
+                socket.close();
+            }catch (IOException e){
+                if (debug) logger.warning("Unable to disconnect!");
+            }
         }
 
     }
 
+
     public static void main(String[] args){
 
+        //Initialize command line parser and options
         CommandLineParser parser = new DefaultParser();
         Options options = commandOptions();
 
+        Socket socket;
+
         try{
+            //parse command line arguments
             CommandLine line = parser.parse(options,args);
 
+            //validate the command option is unique.
             if(!optionsValidator(line)){throw new ParseException("Multiple command options!");}
 
+            //set debug on if toggled
             debug = line.hasOption("debug");
             if (debug) logger.info("setting debug on");
 
+            //get destination host from commandline args
             Host host = getHost(line);
 
+            //get resource template from command args
             ResourceTemplate resourceTemplate = getResourceTemplate(line);
 
-            if(line.hasOption("query")){
-                queryCommand(host,resourceTemplate);
+            //connect to server
+            socket = new Socket(host.getHostname(),host.getPort());
+
+            //proceed commands
+
+            String error_message = null;    //error message when command line options missing
+
+            if(line.hasOption("query")){queryCommand(socket,resourceTemplate);}
+
+            if(line.hasOption("publish")){
+                if(!line.hasOption("uri")){
+                    error_message = "URI is missing.";}
+                else
+                    publishCommand(socket,resourceTemplate);}
+
+            if(line.hasOption("remove")){
+                if(!line.hasOption("uri")){
+                    error_message = "URI is missing.";}
+                else
+                    removeCommand(socket,resourceTemplate);}
+
+            if(line.hasOption("share")){
+                if(!line.hasOption("uri")||!line.hasOption("secret")){
+                    error_message = "URI or secret missing.";;}
+                else
+                    shareCommand(socket,line.getOptionValue("secret"),resourceTemplate);}
+
+            if(line.hasOption("exchange")){
+                if(!line.hasOption("servers")){
+                    error_message = "servers missing.";}
+                else {exchangeCommand(socket,line.getOptionValue("servers"));}
             }
+
+            if(line.hasOption("fetch")){
+                if (!line.hasOption("uri")){
+                    error_message = "URI is missing.";
+                }else fetchCommand(socket,resourceTemplate);
+            }
+
+            if(error_message!=null&&debug){
+                logger.warning(error_message);
+            }
+            socket.close();
 
 
         }catch (ParseException e){
-
-            if (debug) logger.warning(e.getMessage());
+            //If commandline args invalid, show help info.
             HelpFormatter helpFormatter = new HelpFormatter();
             helpFormatter.printHelp("EZShare.Client",options);
 
-        }catch (URISyntaxException e){
-
-            if (debug) logger.warning("Invalid URI");
-
+        }catch (IOException e){
+            if (debug) logger.warning("Unable to Create Socket!");
         }
     }
 

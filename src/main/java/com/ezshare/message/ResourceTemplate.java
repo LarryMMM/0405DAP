@@ -18,7 +18,7 @@ public class ResourceTemplate {
     private final String owner;
     private final String ezserver;
 
-    public ResourceTemplate(String channel, String name, String[] tags,String description, String uri,String owner,String ezserver) throws URISyntaxException{
+    public ResourceTemplate(String channel, String name, String[] tags,String description, String uri,String owner,String ezserver){
         this.channel = channel;
         this.name = name;
         this.tags = tags;
