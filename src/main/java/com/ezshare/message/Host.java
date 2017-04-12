@@ -1,7 +1,5 @@
 package com.ezshare.message;
 
-import java.util.regex.Pattern;
-
 /**
  * Encapsulation of Hostname and port #
  * Created by jason on 9/4/17.

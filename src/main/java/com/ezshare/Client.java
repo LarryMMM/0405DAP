@@ -10,7 +10,6 @@ import org.apache.commons.cli.*;
 
 import java.net.Socket;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.logging.Logger;
 
@@ -330,7 +329,7 @@ public class Client {
      * @param socket    The socket connected to target server.
      * @param serverList The servers in exchange request.
      */
-    public static void exchangeCommand(Socket socket,List<Host> serverList){
+    private static void exchangeCommand(Socket socket,List<Host> serverList){
 
         try{
 
