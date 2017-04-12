@@ -16,8 +16,12 @@ public class FetchMessage extends Message{
         return resourceTemplate;
     }
 
+    /**
+     * Require uri in correct file schema to fetch
+     * @return  Whether the fetch request is in correct format.
+     */
     @Override
-    public boolean validator() {
-        return false;
+    public boolean isValid() {
+        return resourceTemplate.isValid()&&resourceTemplate.isValidFile();
     }
 }

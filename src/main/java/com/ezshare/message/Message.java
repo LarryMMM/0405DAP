@@ -1,13 +1,13 @@
 package com.ezshare.message;
 
-import java.net.URI;
-import java.net.URISyntaxException;
+import com.google.gson.Gson;
 
 /**
  * Base Class of All Messages
  * Created by jason on 10/4/17.
  */
 public class Message extends Validatable {
+    private static final String[] valid_commands = {"QUERY","SHARE","PUBLISH","REMOVE","EXCHANGE","FETCH"};
 
     private final String command;
 
@@ -19,36 +19,21 @@ public class Message extends Validatable {
         return command;
     }
 
+    /**
+     * Validate command name. IMPORTANT:CASE SENSITIVE!
+     * @return  Whether the command name is valid.
+     */
     @Override
-    public boolean validator() {
-        return true;
+    public boolean isValid() {
+        for (String c : valid_commands) {
+            if(c.equals(this.command))
+                return true;
+        }
+        return false;
     }
 
-    /**
-     * Check whether the uri is valid for publish or query.
-     * @param uri   URI to check
-     * @return  Validation.
-     */
-    private static boolean isValidUri(String uri){
-        try{
-            URI u = new URI(uri);
-            return (u.getScheme()!=null&&!u.getScheme().equals("file")&&u.getAuthority()!=null&&u.isAbsolute());}
-        catch (URISyntaxException e){
-            return false;
-        }
-    }
-
-    /**
-     * Check whether the uri is valid for share.
-     * @param uri   URI to check
-     * @return  Validation.
-     */
-    private static boolean isValidFile(String uri){
-        try {
-            URI u = new URI(uri);
-            return (u.getScheme().equals("file")&&u.getPath()!=null&&u.isAbsolute());
-        }catch (URISyntaxException e){
-            return false;
-        }
+    @Override
+    public String toString() {
+        return new Gson().toJson(this);
     }
 }

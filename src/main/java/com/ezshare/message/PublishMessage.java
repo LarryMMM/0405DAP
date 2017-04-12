@@ -18,8 +18,12 @@ public class PublishMessage extends Message{
         return resource;
     }
 
+    /**
+     * Require uri NOT in file schema to publish.
+     * @return  Whether the request is valid to publish.
+     */
     @Override
-    public boolean validator() {
-        return false;
+    public boolean isValid() {
+        return resource.isValid()&&resource.isValidUri();
     }
 }

@@ -25,10 +25,13 @@ public class QueryMessage extends Message {
         return relay;
     }
 
+    /**
+     * URI in query request can be either file schema or not.
+     * @return  Whether the request is valid to query.
+     */
     @Override
-    public boolean validator() {
-
-        return false;
+    public boolean isValid() {
+        return resourceTemplate.isValid()&&(resourceTemplate.isValidFile()||resourceTemplate.isValidUri());
     }
 
 

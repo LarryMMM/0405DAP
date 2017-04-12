@@ -2,6 +2,9 @@ package com.ezshare.message;
 
 import com.google.gson.Gson;
 
+import java.net.URI;
+import java.net.URISyntaxException;
+
 /**
  * Encapsulation of Query Message.
  * Created by jason on 10/4/17.
@@ -54,9 +57,43 @@ public class ResourceTemplate extends Validatable {
         return tags;
     }
 
+    public static boolean isValidString(String s){
+        return (s.equals(s.trim())&&!s.contains("\0"));
+    }
+
+    /**
+     * Check whether the uri is valid for publish or query.
+     * @return  Validation.
+     */
+    public boolean isValidUri(){
+        try{
+            URI u = new URI(this.uri);
+            return (u.getScheme()!=null&&!u.getScheme().equals("file")&&u.getAuthority()!=null&&u.isAbsolute());}
+        catch (URISyntaxException e){
+            return false;
+        }
+    }
+
+    /**
+     * Check whether the uri is valid for share.
+     * @return  Validation.
+     */
+    public boolean isValidFile(){
+        try {
+            URI u = new URI(this.uri);
+            return (u.getScheme().equals("file")&&u.getPath()!=null&&u.isAbsolute());
+        }catch (URISyntaxException e){
+            return false;
+        }
+    }
+
     @Override
-    public boolean validator() {
-        return false;
+    public boolean isValid() {
+        for (String s : this.tags) {
+            if(!isValidString(s)) return false;
+        }
+        return (isValidString(this.channel)&&isValidString(this.description)&&isValidString(this.name)
+                &&isValidString(this.ezserver)&&isValidString(this.owner)&&!this.owner.equals("*")&&isValidString(this.uri));
     }
 
     @Override

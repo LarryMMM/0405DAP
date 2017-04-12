@@ -17,9 +17,13 @@ public class RemoveMessage extends Message{
         return resource;
     }
 
+    /**
+     * URI in remove request can be either file schema or not.
+     * @return  Whether the request is valid to remove.
+     */
     @Override
-    public boolean validator() {
-        return false;
+    public boolean isValid() {
+        return resource.isValid()&&(resource.isValidUri()||resource.isValidFile());
     }
 
 }

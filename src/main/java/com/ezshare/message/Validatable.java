@@ -6,6 +6,6 @@ package com.ezshare.message;
  */
 public abstract class Validatable {
 
-    public abstract boolean validator();
+    public abstract boolean isValid();
 
 }

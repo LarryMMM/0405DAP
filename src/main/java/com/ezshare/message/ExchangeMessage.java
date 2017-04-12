@@ -19,8 +19,17 @@ public class ExchangeMessage extends Message{
         return serverList;
     }
 
+    /**
+     * Validate every host in list.
+     * @return Whether serverList is valid.
+     */
     @Override
-    public boolean validator() {
-        return false;
+    public boolean isValid() {
+        for (Host h:serverList) {
+            if(!h.isValid()){
+                return false;
+            }
+        }
+        return true;
     }
 }

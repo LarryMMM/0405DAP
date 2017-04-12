@@ -24,8 +24,12 @@ public class ShareMessage extends Message{
         return secret;
     }
 
+    /**
+     * URI in share request can only be in file schema.
+     * @return  Whether the request is valid to query.
+     */
     @Override
-    public boolean validator() {
-        return false;
+    public boolean isValid() {
+        return resource.isValid()&&resource.isValidFile();
     }
 }
