@@ -19,7 +19,7 @@ public class PublishMessage extends Message{
     }
 
     @Override
-    public String validator() {
-        return null;
+    public boolean validator() {
+        return false;
     }
 }

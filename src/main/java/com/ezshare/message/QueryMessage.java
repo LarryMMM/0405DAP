@@ -1,5 +1,6 @@
 package com.ezshare.message;
 
+
 /**
  * Encapsulation of Query Command.
  * Created by jason on 9/4/17.
@@ -25,7 +26,11 @@ public class QueryMessage extends Message {
     }
 
     @Override
-    public String validator() {
-        return null;
+    public boolean validator() {
+
+        return false;
     }
+
+
+
 }

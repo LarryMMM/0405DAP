@@ -18,8 +18,8 @@ public class RemoveMessage extends Message{
     }
 
     @Override
-    public String validator() {
-        return null;
+    public boolean validator() {
+        return false;
     }
 
 }

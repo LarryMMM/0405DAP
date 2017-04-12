@@ -9,7 +9,7 @@ import java.net.URISyntaxException;
  * Encapsulation of Query Message.
  * Created by jason on 10/4/17.
  */
-public class ResourceTemplate {
+public class ResourceTemplate extends Validable{
     private final String name;
     private final String[] tags;
     private final String description;
@@ -58,7 +58,14 @@ public class ResourceTemplate {
     }
 
     @Override
+    public boolean validator() {
+        return false;
+    }
+
+    @Override
     public String toString() {
         return new Gson().toJson(this);
     }
+
+
 }
