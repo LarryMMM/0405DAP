@@ -328,9 +328,9 @@ public class Client {
     /**
      * Process exchange command.
      * @param socket    The socket connected to target server.
-     * @param servers The servers in exchange request.
+     * @param serverList The servers in exchange request.
      */
-    private static void exchangeCommand(Socket socket,String servers){
+    public static void exchangeCommand(Socket socket,List<Host> serverList){
 
         try{
 
@@ -338,14 +338,6 @@ public class Client {
             DataOutputStream output = new DataOutputStream(socket.getOutputStream());
 
             if(debug) logger.fine("exchanging to "+socket.getRemoteSocketAddress());
-
-            //parse commandline args to host list
-            String[] s = servers.split(",");
-            List<Host> serverList = new LinkedList<>();
-            for (String server:s) {
-                String[] address = server.split(":");
-                serverList.add(new Host(address[0],Integer.valueOf(address[1])));
-            }
 
             ExchangeMessage exchangeMessage = new ExchangeMessage(serverList);
 
@@ -360,9 +352,6 @@ public class Client {
 
         } catch (IOException e){
             IOExceptionHandler(e,socket);
-        } catch (ArrayIndexOutOfBoundsException | NumberFormatException e){
-            //when value of -servers option invalid
-            if (debug) logger.warning("Server address invalid.");
         } finally {
             try {
                 socket.close();
@@ -509,7 +498,17 @@ public class Client {
             if(line.hasOption("exchange")){
                 if(!line.hasOption("servers")){
                     error_message = "servers missing.";}
-                else {exchangeCommand(socket,line.getOptionValue("servers"));}
+                else {
+
+                    //parse commandline args to host list
+                    String[] s = line.getOptionValue("servers").split(",");
+                    List<Host> serverList = new ArrayList<>();
+                    for (String server:s) {
+                        String[] address = server.split(":");
+                        serverList.add(new Host(address[0],Integer.valueOf(address[1])));
+                    }
+
+                    exchangeCommand(socket,serverList);}
             }
 
             if(line.hasOption("fetch")){
@@ -531,6 +530,9 @@ public class Client {
 
         }catch (IOException e){
             if (debug) logger.warning("Unable to Create Socket!");
+        }catch (ArrayIndexOutOfBoundsException | NumberFormatException e){
+            //when value of -servers option invalid
+            if (debug) logger.warning("Server address invalid.");
         }
     }
 
