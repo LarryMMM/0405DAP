@@ -2,14 +2,11 @@ package com.ezshare.message;
 
 import com.google.gson.Gson;
 
-import java.net.URI;
-import java.net.URISyntaxException;
-
 /**
  * Encapsulation of Query Message.
  * Created by jason on 10/4/17.
  */
-public class ResourceTemplate extends Validable{
+public class ResourceTemplate extends Validatable {
     private final String name;
     private final String[] tags;
     private final String description;

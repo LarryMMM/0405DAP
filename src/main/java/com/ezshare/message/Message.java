@@ -7,7 +7,7 @@ import java.net.URISyntaxException;
  * Base Class of All Messages
  * Created by jason on 10/4/17.
  */
-public abstract class Message extends Validable{
+public abstract class Message extends Validatable {
 
     private final String command;
 

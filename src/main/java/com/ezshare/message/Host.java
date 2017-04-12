@@ -4,7 +4,7 @@ package com.ezshare.message;
  * Encapsulation of Hostname and port #
  * Created by jason on 9/4/17.
  */
-public class Host extends Validable{
+public class Host extends Validatable {
     private final String hostname;
     private final Integer port;
 
