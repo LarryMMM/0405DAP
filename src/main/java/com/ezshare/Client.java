@@ -123,7 +123,7 @@ public class Client {
      * Read simple response.
      * @param input Input stream of the socket
      * @return  The exact response of server or timeout info.
-     * @throws IOException  when connection failed.
+     * @throws IOException  when connection failed or timeout.
      */
     private static String readResponse(DataInputStream input) throws IOException{
         //set timer
@@ -136,9 +136,20 @@ public class Client {
                 return input.readUTF();
             }
             //set timeout
-            if (t2-t1>5000){
-                return "timeout";}
+            if (t2-t1>5000){throw new IOException("TIMEOUT");}
         }
+    }
+
+    /**
+     * Handle IOException of Socket connection.
+     * @param e IOException object.
+     * @param socket    Socket that threw the exception.
+     */
+    private static void IOExceptionHandler(IOException e, Socket socket){
+        if (e.getMessage().equals("TIMEOUT")){
+            if (debug) logger.warning("Connection Timeout!"+socket.getRemoteSocketAddress());}
+        else {
+            if (debug) logger.warning("Connection Failure."+socket.getRemoteSocketAddress());}
     }
 
     /**
@@ -182,14 +193,11 @@ public class Client {
             }else if(response.contains("error")){
                 //when error occur
                 if(debug) logger.warning("RECEIVED:"+response);
-            }else if(response.contains("timeout")){
-                //when connection timeout
-                if (debug) logger.warning("CONNECTION TIMEOUT!");
             }
 
 
         } catch (IOException e){
-            if (debug) logger.warning("Connection Failure."+socket.getRemoteSocketAddress());
+            IOExceptionHandler(e,socket);
         }finally {
 
             //try to terminate connection no matter what happened
@@ -227,13 +235,11 @@ public class Client {
                 logger.warning("RECEIVED:"+response);
             if(response.contains("success")&&debug)
                 logger.fine("RECEIVED:"+response);
-            if(response.contains("timeout")&&debug)
-                logger.warning("CONNECTION TIMEOUT!");
 
 
 
         } catch (IOException e){
-            if (debug) logger.warning("Unable to connect to "+socket.getRemoteSocketAddress());
+            IOExceptionHandler(e,socket);
         } finally {
             try {
                 socket.close();
@@ -268,12 +274,10 @@ public class Client {
                 logger.warning("RECEIVED:"+response);
             if(response.contains("success")&&debug)
                 logger.fine("RECEIVED:"+response);
-            if(response.contains("timeout")&&debug)
-                logger.warning("CONNECTION TIMEOUT!");
 
 
         } catch (IOException e){
-            if (debug) logger.warning("Unable to connect to "+socket.getRemoteSocketAddress());
+            IOExceptionHandler(e,socket);
         }finally {
             try {
                 socket.close();
@@ -308,12 +312,10 @@ public class Client {
                 logger.warning("RECEIVED:"+response);
             if(response.contains("success")&&debug)
                 logger.fine("RECEIVED:"+response);
-            if(response.contains("timeout")&&debug)
-                logger.warning("CONNECTION TIMEOUT!");
 
 
         } catch (IOException e){
-            if (debug) logger.warning("Connection Failed"+socket.getRemoteSocketAddress());
+            IOExceptionHandler(e,socket);
         }finally {
             try {
                 socket.close();
@@ -355,13 +357,9 @@ public class Client {
                 logger.warning("RECEIVED:"+response);
             if(response.contains("success")&&debug)
                 logger.fine("RECEIVED:"+response);
-            if(response.contains("timeout")&&debug)
-                logger.warning("CONNECTION TIMEOUT!");
-
-
 
         } catch (IOException e){
-            if (debug) logger.warning("Connection Failed"+socket.getRemoteSocketAddress());
+            IOExceptionHandler(e,socket);
         } catch (ArrayIndexOutOfBoundsException | NumberFormatException e){
             //when value of -servers option invalid
             if (debug) logger.warning("Server address invalid.");
@@ -439,10 +437,12 @@ public class Client {
 
                 }
 
+            }else if(response.contains("error")){
+                if(debug)   logger.warning("RECEIVED:"+response);
             }
+
         } catch (IOException e){
-            if (debug) logger.warning("Connection Failed "+socket.getRemoteSocketAddress());
-            e.printStackTrace();
+            IOExceptionHandler(e,socket);
         } finally {
             try {
                 socket.close();
