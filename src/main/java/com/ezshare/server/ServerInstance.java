@@ -4,9 +4,9 @@ import com.ezshare.log.LogCustomFormatter;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.HashMap;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.Logger;
@@ -38,7 +38,7 @@ public class ServerInstance {
     /*
         A HashMap to record the mapping from a specified client to the starting time of its last connection
     */
-    private static HashMap<String, Long> intervalLimit = new HashMap<>();
+    private static ConcurrentHashMap<String, Long> intervalLimit = new ConcurrentHashMap<String, Long>();
 
     
     public static void main(String[] args) {
