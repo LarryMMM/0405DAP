@@ -8,7 +8,10 @@ import com.ezshare.message.FileTemplate;
 import com.google.gson.Gson;
 import org.apache.commons.cli.*;
 
+import java.net.ConnectException;
+import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
@@ -23,7 +26,8 @@ public class Client {
     private static final String download_path = "Downloads/";
     private static final Logger logger = LogCustomFormatter.getLogger(Client.class.getName());
     private static final Gson gson = new Gson();
-    private static boolean debug;
+    private static final int TIME_OUT = 2000;
+    private static boolean debug = false;
 
     /**
      * Construct command line options
@@ -118,38 +122,6 @@ public class Client {
         if(debug) logger.fine("SENT:"+JSON);
     }
 
-    /**
-     * Read simple response.
-     * @param input Input stream of the socket
-     * @return  The exact response of server or timeout info.
-     * @throws IOException  when connection failed or timeout.
-     */
-    private static String readResponse(DataInputStream input) throws IOException{
-        //set timer
-        long t1 = System.currentTimeMillis();
-
-        while (true){
-
-            long t2 = System.currentTimeMillis();
-            if(input.available()>0){
-                return input.readUTF();
-            }
-            //set timeout
-            if (t2-t1>5000){throw new IOException("TIMEOUT");}
-        }
-    }
-
-    /**
-     * Handle IOException of Socket connection.
-     * @param e IOException object.
-     * @param socket    Socket that threw the exception.
-     */
-    private static void IOExceptionHandler(IOException e, Socket socket){
-        if (e.getMessage().equals("TIMEOUT")){
-            if (debug) logger.warning("Connection Timeout!"+socket.getRemoteSocketAddress());}
-        else {
-            if (debug) logger.warning("Connection Failure."+socket.getRemoteSocketAddress());}
-    }
 
     /**
      * Process query command.
@@ -157,11 +129,10 @@ public class Client {
      * @param socket    The socket connected to target server.
      * @param resourceTemplate  The encapsulation of the resource.
      */
-    public static List<ResourceTemplate> queryCommand(Socket socket,ResourceTemplate resourceTemplate){
+    public static List<ResourceTemplate> queryCommand(Socket socket,ResourceTemplate resourceTemplate) throws IOException{
 
+        socket.setSoTimeout(TIME_OUT);
         List<ResourceTemplate> result = new ArrayList<>();
-
-        try{
 
             DataInputStream input = new DataInputStream(socket.getInputStream());
             DataOutputStream output = new DataOutputStream(socket.getOutputStream());
@@ -173,19 +144,19 @@ public class Client {
             String JSON = gson.toJson(queryMessage);
             sendMessage(output,JSON);
 
-            String response = readResponse(input);
+            String response = input.readUTF();
 
             //receive response
             if(response.contains("success")){
                 //if success print resources
                 if(debug)   logger.fine("RECEIVE:"+response);
-                response = readResponse(input); //discard success message
+                response = input.readUTF(); //discard success message
                 while (!response.contains("resultSize")){
                     //print out resources
                     ResourceTemplate r = gson.fromJson(response,ResourceTemplate.class);
                     result.add(r);
                     System.out.println(response);
-                    response = readResponse(input);
+                    response = input.readUTF();
                 }
                 //receive result size for successful request
                 if(debug)   logger.fine("RECEIVE_ALL:"+response);
@@ -194,19 +165,6 @@ public class Client {
                 if(debug) logger.warning("RECEIVED:"+response);
             }
 
-
-        } catch (IOException e){
-            IOExceptionHandler(e,socket);
-        }finally {
-
-            //try to terminate connection no matter what happened
-            try {
-                socket.close();
-            }catch (IOException e){
-                if (debug) logger.warning("Unable to disconnect!");
-            }
-
-        }
         return result;
     }
 
@@ -215,9 +173,9 @@ public class Client {
      * @param socket    The socket connected to target server.
      * @param resourceTemplate  The encapsulation of the resource.
      */
-    private static void publishCommand(Socket socket,ResourceTemplate resourceTemplate){
-        try{
+    private static void publishCommand(Socket socket,ResourceTemplate resourceTemplate) throws IOException{
 
+            socket.setSoTimeout(TIME_OUT);
             DataInputStream input = new DataInputStream(socket.getInputStream());
             DataOutputStream output = new DataOutputStream(socket.getOutputStream());
 
@@ -228,7 +186,7 @@ public class Client {
             String JSON = gson.toJson(publishMessage);
             sendMessage(output,JSON);
 
-            String response = readResponse(input);
+            String response = input.readUTF();
 
             if(response.contains("error")&&debug)
                 logger.warning("RECEIVED:"+response);
@@ -236,16 +194,6 @@ public class Client {
                 logger.fine("RECEIVED:"+response);
 
 
-
-        } catch (IOException e){
-            IOExceptionHandler(e,socket);
-        } finally {
-            try {
-                socket.close();
-            }catch (IOException e){
-                if (debug) logger.warning("Unable to disconnect!");
-            }
-        }
     }
 
     /**
@@ -254,10 +202,9 @@ public class Client {
      * @param socket    The socket connected to target server.
      * @param resourceTemplate  The encapsulation of the resource.
      */
-    private static void shareCommand(Socket socket,String secret,ResourceTemplate resourceTemplate){
+    private static void shareCommand(Socket socket,String secret,ResourceTemplate resourceTemplate) throws IOException{
 
-        try{
-
+            socket.setSoTimeout(TIME_OUT);
             DataInputStream input = new DataInputStream(socket.getInputStream());
             DataOutputStream output = new DataOutputStream(socket.getOutputStream());
 
@@ -268,22 +215,13 @@ public class Client {
             String JSON = gson.toJson(shareMessage);
             sendMessage(output,JSON);
 
-            String response = readResponse(input);
+            String response = input.readUTF();
             if(response.contains("error")&&debug)
                 logger.warning("RECEIVED:"+response);
             if(response.contains("success")&&debug)
                 logger.fine("RECEIVED:"+response);
 
 
-        } catch (IOException e){
-            IOExceptionHandler(e,socket);
-        }finally {
-            try {
-                socket.close();
-            }catch (IOException e){
-                if (debug) logger.warning("Unable to disconnect!");
-            }
-        }
     }
 
     /**
@@ -291,11 +229,9 @@ public class Client {
      * @param socket    The socket connected to target server.
      * @param resourceTemplate  The encapsulation of the resource.
      */
-    private static void removeCommand(Socket socket,ResourceTemplate resourceTemplate){
+    private static void removeCommand(Socket socket,ResourceTemplate resourceTemplate) throws IOException{
 
-
-        try{
-
+            socket.setSoTimeout(TIME_OUT);
             DataInputStream input = new DataInputStream(socket.getInputStream());
             DataOutputStream output = new DataOutputStream(socket.getOutputStream());
 
@@ -306,22 +242,13 @@ public class Client {
             String JSON = gson.toJson(removeMessage);
             sendMessage(output,JSON);
 
-            String response = readResponse(input);
+            String response = input.readUTF();
             if(response.contains("error")&&debug)
                 logger.warning("RECEIVED:"+response);
             if(response.contains("success")&&debug)
                 logger.fine("RECEIVED:"+response);
 
 
-        } catch (IOException e){
-            IOExceptionHandler(e,socket);
-        }finally {
-            try {
-                socket.close();
-            }catch (IOException e){
-                if (debug) logger.warning("Unable to disconnect!");
-            }
-        }
     }
 
     /**
@@ -329,10 +256,10 @@ public class Client {
      * @param socket    The socket connected to target server.
      * @param serverList The servers in exchange request.
      */
-    private static void exchangeCommand(Socket socket,List<Host> serverList){
+    private static void exchangeCommand(Socket socket,List<Host> serverList) throws IOException{
 
-        try{
 
+            socket.setSoTimeout(TIME_OUT);
             DataInputStream input = new DataInputStream(socket.getInputStream());
             DataOutputStream output = new DataOutputStream(socket.getOutputStream());
 
@@ -343,21 +270,12 @@ public class Client {
             String JSON = gson.toJson(exchangeMessage);
             sendMessage(output,JSON);
 
-            String response = readResponse(input);
+            String response = input.readUTF();
             if(response.contains("error")&&debug)
                 logger.warning("RECEIVED:"+response);
             if(response.contains("success")&&debug)
                 logger.fine("RECEIVED:"+response);
 
-        } catch (IOException e){
-            IOExceptionHandler(e,socket);
-        } finally {
-            try {
-                socket.close();
-            }catch (IOException e){
-                if (debug) logger.warning("Unable to disconnect!");
-            }
-        }
     }
 
     /**
@@ -365,10 +283,9 @@ public class Client {
      * @param socket    The socket connected to target server.
      * @param resourceTemplate  The encapsulation of the resource.
      */
-    private static void fetchCommand(Socket socket,ResourceTemplate resourceTemplate){
+    private static void fetchCommand(Socket socket,ResourceTemplate resourceTemplate) throws IOException{
 
 
-        try{
             DataInputStream input = new DataInputStream(socket.getInputStream());
             DataOutputStream output = new DataOutputStream(socket.getOutputStream());
 
@@ -379,12 +296,12 @@ public class Client {
             String JSON = gson.toJson(fetchMessage);
             sendMessage(output,JSON);
 
-            String response = readResponse(input);
+            String response = input.readUTF();
             if(response.contains("success")){
 
                 if(debug)logger.fine("RECEIVED:"+response);
                 //try to read file template
-                String file_template = readResponse(input);
+                String file_template = input.readUTF();
 
                 if(debug) logger.fine("RECEIVE:"+file_template);
                 //if result size is 0
@@ -420,7 +337,7 @@ public class Client {
                 fileOutputStream.close();
 
                 //read resourceSize
-                response = readResponse(input);
+                response = input.readUTF();
                 logger.fine("RECEIVED:"+response);
 
                 }
@@ -428,16 +345,6 @@ public class Client {
             }else if(response.contains("error")){
                 if(debug)   logger.warning("RECEIVED:"+response);
             }
-
-        } catch (IOException e){
-            IOExceptionHandler(e,socket);
-        } finally {
-            try {
-                socket.close();
-            }catch (IOException e){
-                if (debug) logger.warning("Unable to disconnect!");
-            }
-        }
 
     }
 
@@ -448,7 +355,7 @@ public class Client {
         CommandLineParser parser = new DefaultParser();
         Options options = commandOptions();
 
-        Socket socket;
+        Socket socket = new Socket();
 
         try{
             //parse command line arguments
@@ -468,7 +375,7 @@ public class Client {
             ResourceTemplate resourceTemplate = getResourceTemplate(line);
 
             //connect to server
-            socket = new Socket(host.getHostname(),host.getPort());
+            socket.connect(new InetSocketAddress(host.getHostname(),host.getPort()),TIME_OUT);
 
             //proceed commands
 
@@ -519,19 +426,27 @@ public class Client {
             if(error_message!=null&&debug){
                 logger.warning(error_message);
             }
-            socket.close();
 
 
         }catch (ParseException e){
             //If commandline args invalid, show help info.
             HelpFormatter helpFormatter = new HelpFormatter();
             helpFormatter.printHelp("EZShare.Client",options);
-
-        }catch (IOException e){
-            if (debug) logger.warning("Unable to Create Socket!");
+        }catch (ConnectException e){
+            if(debug) logger.warning("Socket connection timeout!");
         }catch (ArrayIndexOutOfBoundsException | NumberFormatException e){
             //when value of -servers option invalid
             if (debug) logger.warning("Server address invalid.");
+        }catch (SocketTimeoutException e){
+            if (debug) logger.warning("Socket timeout!");
+
+        }catch (IOException e){
+            if (debug) logger.warning("IOException!");}
+        finally {
+            try {
+                socket.close();
+            }catch (IOException e){
+                if (debug) logger.warning("IOException! Disconnect!");}
         }
     }
 
