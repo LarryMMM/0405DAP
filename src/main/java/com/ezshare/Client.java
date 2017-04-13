@@ -98,11 +98,13 @@ public class Client {
         //parse commandline args to ResourceTemplate object
         String channel = line.getOptionValue("channel","");
         String name = line.getOptionValue("name","");
-        String[] tags = (line.hasOption("tags"))?line.getOptionValue("tags").split(","):null;
+        String[] tags = {};
+        if (line.hasOption("tags"))
+            tags = line.getOptionValue("tags").split(",");
         String description = line.getOptionValue("description","");
         String uri = (line.hasOption("uri"))?line.getOptionValue("uri"):"";
         String owner = line.getOptionValue("owner","");
-        String ezserver = line.getOptionValue("ezserver","");
+        String ezserver = line.getOptionValue("servers","");
 
         return new ResourceTemplate(channel,name,tags,description,uri,owner,ezserver);
 
@@ -388,7 +390,6 @@ public class Client {
                     error_message = "URI is missing.";}
                 else
                     publishCommand(socket,resourceTemplate);}
-
             if(line.hasOption("remove")){
                 if(!line.hasOption("uri")){
                     error_message = "URI is missing.";}
