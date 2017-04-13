@@ -10,19 +10,25 @@ import java.net.URISyntaxException;
  * Created by jason on 10/4/17.
  */
 public class ResourceTemplate extends Validatable {
-    private final String name;
-    private final String[] tags;
-    private final String description;
-    private final String uri;
-    private final String channel;
-    private final String owner;
-    private final String ezserver;
+    private String name = "";
+    private String[] tags = {};
+    private String description = "";
+    private String uri = "";
+    private String channel = "";
+    private String owner = "";
+    private String ezserver = "";
+
+    /**
+     * Only for Gson.
+     */
+    public ResourceTemplate(){
+    }
 
     public ResourceTemplate(String channel, String name, String[] tags,String description, String uri,String owner,String ezserver){
         this.channel = channel;
         this.name = name;
         this.tags = tags;
-        this.description = description;
+        this.description =description;
         this.uri = uri;
         this.owner = owner;
         this.ezserver = ezserver;
