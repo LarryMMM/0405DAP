@@ -57,10 +57,6 @@ public class ResourceTemplate extends Validatable {
         return tags;
     }
 
-    public static boolean isValidString(String s){
-        return (s.equals(s.trim())&&!s.contains("\0"));
-    }
-
     /**
      * Check whether the uri is valid for publish or query.
      * @return  Validation.
@@ -89,16 +85,32 @@ public class ResourceTemplate extends Validatable {
 
     @Override
     public boolean isValid() {
-        for (String s : this.tags) {
-            if(!isValidString(s)) return false;
-        }
-        return (isValidString(this.channel)&&isValidString(this.description)&&isValidString(this.name)
-                &&isValidString(this.ezserver)&&isValidString(this.owner)&&!this.owner.equals("*")&&isValidString(this.uri));
+       return owner!=null&&owner.equals("*");
     }
 
     @Override
     public String toString() {
         return new Gson().toJson(this);
+    }
+
+
+    /**
+     * Check if two resourceTemplate objects match in the query.
+     * @param list  Resource in list.
+     * @return  Match or not
+     */
+
+    public boolean match(ResourceTemplate list){
+
+        return string_match(this.getName(),list.getName())
+                &&string_match(this.getOwner(),list.getOwner())
+                &&string_match(this.getChannel(),list.getChannel())
+                &&string_match(this.getUri(),list.getUri())
+                &&string_match(this.getDescription(),list.getDescription());
+    }
+
+    private static boolean string_match(String s1,String s2){
+        return (s1==null||s2==null||s1.equals("")||s2.equals("")||s1.equals(s2));
     }
 
 
