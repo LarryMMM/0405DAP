@@ -1,6 +1,8 @@
 package com.ezshare.server;
 
 import com.ezshare.message.FileTemplate;
+import com.ezshare.message.ResourceTemplate;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.locks.Lock;
@@ -13,38 +15,38 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  */
 public class FileList {
 
-    private List<FileTemplate> fileTemplateList = new ArrayList<>();
+    private List<ResourceTemplate> resourceTemplateList = new ArrayList<>();
     private ReadWriteLock lock = new ReentrantReadWriteLock();
 
     /**
      * add a new file to filelist
      *
      *
-     * @param FileTemplate
+     * @param ResourceTemplate
      * @return boolean
      *
      * */
-    public boolean add(FileTemplate fileTemplate) {
+    public boolean add(ResourceTemplate resourceTemplate) {
         lock.writeLock().lock();
         try{
-            if(fileTemplateList.isEmpty()){
-                fileTemplateList.add(fileTemplate);
+            if(resourceTemplateList.isEmpty()){
+                resourceTemplateList.add(resourceTemplate);
                 return true;
             }
 
             else{
-                for(int i = 0 ; i < fileTemplateList.size(); i++) {
-                    FileTemplate f = fileTemplateList.get(i);
-                    if(f.getChannel().equals(fileTemplate.getChannel()) && f.getUri().equals(fileTemplate.getUri())){
-                        if(f.getOwner().equals(fileTemplate.getOwner())){
-                            fileTemplateList.set(i, fileTemplate);
+                for(int i = 0 ; i < resourceTemplateList.size(); i++) {
+                    ResourceTemplate f = resourceTemplateList.get(i);
+                    if(f.getChannel().equals(resourceTemplate.getChannel()) && f.getUri().equals(resourceTemplate.getUri())){
+                        if(f.getOwner().equals(resourceTemplate.getOwner())){
+                            resourceTemplateList.set(i, resourceTemplate);
                             return true;
                         }
                         return false;
                     }
 
                 }
-                fileTemplateList.add(fileTemplate);
+                resourceTemplateList.add(resourceTemplate);
                 return true;
             }
         }finally {
@@ -56,17 +58,17 @@ public class FileList {
      * delete a file from filelist
      *
      *
-     * @param FileTemplate
+     * @param ResourceTemplate
      * @return boolean
      *
      * */
-    public boolean remove(FileTemplate fileTemplate) {
+    public boolean remove(ResourceTemplate resourceTemplate) {
         lock.writeLock().lock();
         try{
-            for(int i = 0 ; i < fileTemplateList.size(); i++) {
-                FileTemplate f = fileTemplateList.get(i);
-                if (f.getChannel().equals(fileTemplate.getChannel()) && f.getUri().equals(fileTemplate.getUri()) && f.getOwner().equals(fileTemplate.getOwner())) {
-                    fileTemplateList.remove(i);
+            for(int i = 0 ; i < resourceTemplateList.size(); i++) {
+                ResourceTemplate f = resourceTemplateList.get(i);
+                if (f.getChannel().equals(resourceTemplate.getChannel()) && f.getUri().equals(resourceTemplate.getUri()) && f.getOwner().equals(resourceTemplate.getOwner())) {
+                    resourceTemplateList.remove(i);
                     return true;
                 }
             }
@@ -81,16 +83,16 @@ public class FileList {
      * search a certain list of file by owner, uri and channel in filelist
      *
      *
-     * @param FileTemplate
+     * @param ResourceTemplate
      * @return querylist
      *
      * */
-    public List<FileTemplate> query(FileTemplate fileTemplate) {
+    public List<ResourceTemplate> query(ResourceTemplate resourceTemplate) {
         lock.readLock().lock();
-        List<FileTemplate> queryList = new ArrayList<>();
+        List<ResourceTemplate> queryList = new ArrayList<>();
         try{
-            for(FileTemplate f : fileTemplateList) {
-                if (f.getChannel().equals(fileTemplate.getChannel()) && f.getUri().equals(fileTemplate.getUri()) && f.getOwner().equals(fileTemplate.getOwner())) {
+            for(ResourceTemplate f : resourceTemplateList) {
+                if (f.match(resourceTemplate)) {
                     queryList.add(f);
                 }
             }
