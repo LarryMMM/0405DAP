@@ -26,7 +26,7 @@ public class Client {
     private static final String download_path = "Downloads/";
     private static final Logger logger = LogCustomFormatter.getLogger(Client.class.getName());
     private static final Gson gson = new Gson();
-    private static final int TIME_OUT = 2000;
+    private static final int TIME_OUT = 3000;
     private static boolean debug = false;
 
     /**

@@ -21,6 +21,10 @@ public class FileTemplate extends ResourceTemplate {
         super();
     }
 
+    public FileTemplate(ResourceTemplate r){
+        super(r.getChannel(),r.getName(),r.getTag(),r.getDescription(),r.getUri(),r.getOwner(),r.getEzserver());
+    }
+
     public FileTemplate(String channel, String name, String[] tags, String description, String uri, String owner, String ezserver,int resourceSize){
         super(channel, name, tags, description, uri, owner, ezserver);
         this.resourceSize = resourceSize;
