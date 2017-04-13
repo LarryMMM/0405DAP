@@ -305,13 +305,14 @@ public class Client {
                 //try to read file template
                 String file_template = input.readUTF();
 
-                if(debug) logger.fine("RECEIVE:"+file_template);
+
                 //if result size is 0
-                if (response.contains("resultSize")){
-                    if(debug)logger.warning("RECEIVED:"+response);
+                if (file_template.contains("resultSize")){
+                    if(debug)logger.warning("RECEIVED_ALL:"+file_template);
                 }
                 else {
                 //result exist! parse resource template
+                if(debug) logger.fine("RECEIVE:"+file_template);
                 FileTemplate receivedFileTemplate = gson.fromJson(file_template,FileTemplate.class);
 
                 int resource_size = receivedFileTemplate.getResourceSize();
