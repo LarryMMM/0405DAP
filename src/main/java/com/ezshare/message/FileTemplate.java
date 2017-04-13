@@ -14,9 +14,6 @@ public class FileTemplate extends ResourceTemplate {
      */
     private int resourceSize = 0;
 
-    /**
-     * Only for Gson.
-     */
     public FileTemplate(){
         super();
     }
