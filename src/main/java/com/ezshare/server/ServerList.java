@@ -7,9 +7,13 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.ConnectException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
 import java.net.Socket;
+import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
@@ -25,8 +29,8 @@ public class ServerList {
     private final List<Host> serverList = new ArrayList<>();
     
     public ServerList() {
-        /* Add default dummy host (not available) */
-        Host host = new Host("localhost", 3001);
+        /* Add a default dummy host (which is of course not available) */
+        Host host = new Host("localhorse", 9527);
         this.serverList.add(host);
     }
     
@@ -37,7 +41,10 @@ public class ServerList {
     public synchronized int updateServerList(List<Host> inputServerList) {
         int addCount = 0;
         for (Host inputHost : inputServerList) {
-            if (!containsHost(inputHost)) {
+            /* 
+                Discard host if (1) already in the list (2) is a local address
+            */
+            if (!containsHost(inputHost) && !isMyIpAddress(inputHost.getHostname())) {
                 serverList.add(inputHost);
                 ++addCount;
             }
@@ -100,5 +107,26 @@ public class ServerList {
             }
         }
         return false;
+    }
+    
+    private boolean isMyIpAddress(String ipAddress) {
+        InetAddress addr;
+        try {
+            addr = InetAddress.getByName(ipAddress);
+        } catch (UnknownHostException ex) {
+            /* False-positive!!! If error occurred, the address should not be added to the server list. */
+            return true;
+        }
+        /* Check if the address is a valid special local or loop back */
+        if (addr.isAnyLocalAddress() || addr.isLoopbackAddress()) {
+            return true;
+        }
+
+        /* Check if the address is defined on any interface */
+        try {
+            return NetworkInterface.getByInetAddress(addr) != null;
+        } catch (SocketException e) {
+            return false;
+        }
     }
 }
