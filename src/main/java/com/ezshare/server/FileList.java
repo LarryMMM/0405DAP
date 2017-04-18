@@ -3,7 +3,12 @@ package com.ezshare.server;
 import com.ezshare.message.FileTemplate;
 import com.ezshare.message.ResourceTemplate;
 
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -99,5 +104,26 @@ public class FileList {
         }finally {
             lock.readLock().unlock();
         }
+    }
+    
+    public void sendFile(String uri, DataOutputStream output ){
+    	File f = new File(uri);
+		if(f.exists()){
+						
+			try {			
+				
+				// Start sending file
+				RandomAccessFile byteFile = new RandomAccessFile(f,"r");
+				byte[] sendingBuffer = new byte[1024*1024];
+				int num;
+				// While there are still bytes to send..
+				while((num = byteFile.read(sendingBuffer)) > 0){
+					output.write(Arrays.copyOf(sendingBuffer, num));
+				}
+				byteFile.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
     }
 }

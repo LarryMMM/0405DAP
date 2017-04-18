@@ -96,7 +96,7 @@ public class ServerList {
         }
     }
     
-    private synchronized void removeServer(Host inputHost) {
+    public synchronized void removeServer(Host inputHost) {
         serverList.remove(inputHost);
     }
     
