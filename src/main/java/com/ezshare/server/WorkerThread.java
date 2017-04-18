@@ -3,16 +3,19 @@ package com.ezshare.server;
 import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.RandomAccessFile;
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,7 +30,7 @@ import com.google.gson.Gson;
 
 /**
  *
- * @author Wenhao Zhao
+ * @author Yuqing Liu
  */
 public class WorkerThread extends Thread {
 
@@ -153,6 +156,7 @@ public class WorkerThread extends Thread {
     		}
     		else{
     			// successfully publish a resource
+    			resourceTemplate.setEzserver(ServerInstance.HOST+":"+ServerInstance.PORT);
     			if(fileList.add(resourceTemplate)){
     				responMessage.put("response", "success");
     				JSON = gson.toJson(responMessage);
@@ -224,6 +228,7 @@ public class WorkerThread extends Thread {
     			} 
     			else{
     				// successfully publish a resource
+    				resourceTemplate.setEzserver(ServerInstance.HOST+":"+ServerInstance.PORT);
         			if(fileList.add(resourceTemplate)){
         				responMessage.put("response", "success");
         				JSON = gson.toJson(responMessage);
@@ -367,12 +372,11 @@ public class WorkerThread extends Thread {
     		            try {    		            	
     		            	
 							DataOutputStream s_output = new DataOutputStream(socket.getOutputStream());
-							JSON = gson.toJson(queryMessage);
-	    		            /*
-	    		             * owner,channel=""
-	    		             * relay = false
-	    		             * 
-	    		             * */
+							ResourceTemplate queryRT = queryMessage.getResourceTemplate();
+							queryRT.setChannel("");
+							queryRT.setOwner("");
+							QueryMessage relayQueryMessage = new QueryMessage(queryRT,false);
+							JSON = gson.toJson(relayQueryMessage);
 							s_output.writeUTF(JSON);
 						} catch (IOException e) {
 							// TODO Auto-generated catch block
@@ -478,10 +482,10 @@ public class WorkerThread extends Thread {
         			}
         			else{
         				for(ResourceTemplate rt : queryList){    					
-        					String resource = gson.toJson(rt);
         					if(!rt.getOwner().isEmpty()){
-        						resource.replaceAll("\"owner\"( )?:( )?\"[A-Za-z0-9]{1,}\"", "\"owner\" : \"*\"");
-        					}    					
+        						rt.setOwner("");
+        					}   
+        					String resource = gson.toJson(rt);
         					try {
     							output.writeUTF(resource);
     						} catch (IOException e) {
@@ -530,7 +534,7 @@ public class WorkerThread extends Thread {
 				}
     		}
     		else{
-    			// successfully fetch a resource
+    			// to fetch a resource
     			List<ResourceTemplate> queryList = fileList.query(resourceTemplate);
     			int resultSize = queryList.size();
     			responMessage.put("response", "success");
@@ -541,6 +545,7 @@ public class WorkerThread extends Thread {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
+				//if there is not a file described by client existing in this server
     			if(resultSize==0){
     				JSON = "{\"resultSize\" : "+resultSize+"}";
     				try {
@@ -550,19 +555,19 @@ public class WorkerThread extends Thread {
 						e.printStackTrace();
 					}
     			}
+    			//send the file to client
     			else{
     				ResourceTemplate rt = queryList.get(0);
-    				String resource = gson.toJson(rt);
 					if(!rt.getOwner().isEmpty()){
-						resource.replaceAll("\"owner\"( )?:( )?\"[A-Za-z0-9]{1,}\"", "\"owner\" : \"*\"");
+						rt.setOwner("");
 					}
+					String resource = gson.toJson(rt);
 					try {
-						output.writeUTF(JSON);
+						output.writeUTF(resource);
 					} catch (IOException e) {
-						// TODO Auto-generated catch block
 						e.printStackTrace();
 					}
-					fileList.sendFile(rt.getUri(), output);    	
+					sendFile(rt.getUri(), output);    	
     				JSON = "{\"resultSize\" : "+resultSize+"}";
     				try {
 						output.writeUTF(JSON);
@@ -576,6 +581,8 @@ public class WorkerThread extends Thread {
     		}
     	}
     }
+    
+    
     private void procExchangeCommand(ExchangeMessage exchangeMessage,ServerList serverList,DataOutputStream output ){
     	List<Host> hostList = exchangeMessage.getServerList();
     	Map<String, String> responMessage = new HashMap<String, String>();
@@ -624,6 +631,27 @@ public class WorkerThread extends Thread {
     			
     		}
     	}
+    }
+    
+    private void sendFile(String uri, DataOutputStream output ){
+    	File f = new File(uri);
+		if(f.exists()){
+						
+			try {			
+				
+				// Start sending file
+				RandomAccessFile byteFile = new RandomAccessFile(f,"r");
+				byte[] sendingBuffer = new byte[1024*1024];
+				int num;
+				// While there are still bytes to send..
+				while((num = byteFile.read(sendingBuffer)) > 0){
+					output.write(Arrays.copyOf(sendingBuffer, num));
+				}
+				byteFile.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
     }
     
     private void closeAll() {

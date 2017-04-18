@@ -106,24 +106,5 @@ public class FileList {
         }
     }
     
-    public void sendFile(String uri, DataOutputStream output ){
-    	File f = new File(uri);
-		if(f.exists()){
-						
-			try {			
-				
-				// Start sending file
-				RandomAccessFile byteFile = new RandomAccessFile(f,"r");
-				byte[] sendingBuffer = new byte[1024*1024];
-				int num;
-				// While there are still bytes to send..
-				while((num = byteFile.read(sendingBuffer)) > 0){
-					output.write(Arrays.copyOf(sendingBuffer, num));
-				}
-				byteFile.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
-    }
+    
 }
