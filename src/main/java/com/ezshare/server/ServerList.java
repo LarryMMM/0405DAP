@@ -28,11 +28,11 @@ public class ServerList {
     /* TO-DO: What if serverList contains itself? */
     private final List<Host> serverList = new ArrayList<>();
     
-    public ServerList() {
-        /* Add a default dummy host (which is of course not available) */
-        Host host = new Host("localhorse", 9527);
-        this.serverList.add(host);
-    }
+//    public ServerList() {
+//        /* Add a default dummy host (which is of course not available) */
+//        Host host = new Host("localhorse", 9527);
+//        this.serverList.add(host);
+//    }
     
     public synchronized List<Host> getServerList() {
         return serverList;

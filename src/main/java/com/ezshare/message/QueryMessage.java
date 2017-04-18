@@ -34,7 +34,7 @@ public class QueryMessage extends Message {
      */
     @Override
     public boolean isValid() {
-        return resourceTemplate.isValid()&&(resourceTemplate.isValidFile()||resourceTemplate.isValidUri());
+        return resourceTemplate.isValid();
     }
 
 

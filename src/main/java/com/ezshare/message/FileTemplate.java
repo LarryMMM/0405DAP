@@ -12,7 +12,7 @@ public class FileTemplate extends ResourceTemplate {
         TO-DO!
         
      */
-    private int resourceSize = 0;
+    private long resourceSize = 0;
 
     /**
      * Only for gson.
@@ -21,8 +21,9 @@ public class FileTemplate extends ResourceTemplate {
         super();
     }
 
-    public FileTemplate(ResourceTemplate r){
+    public FileTemplate(ResourceTemplate r,long resourceSize){
         super(r.getChannel(),r.getName(),r.getTag(),r.getDescription(),r.getUri(),r.getOwner(),r.getEzserver());
+        this.resourceSize = resourceSize;
     }
 
     public FileTemplate(String channel, String name, String[] tags, String description, String uri, String owner, String ezserver,int resourceSize){
@@ -30,7 +31,7 @@ public class FileTemplate extends ResourceTemplate {
         this.resourceSize = resourceSize;
     }
 
-    public int getResourceSize() {
+    public long getResourceSize() {
         return resourceSize;
     }
 

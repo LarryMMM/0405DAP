@@ -1,6 +1,7 @@
 package com.ezshare.server;
 
 import com.ezshare.log.LogCustomFormatter;
+import com.ezshare.message.Host;
 import org.apache.commons.cli.*;
 
 import java.io.IOException;
@@ -25,7 +26,7 @@ import javax.net.ServerSocketFactory;
 public class ServerInstance {
 
     /* Configuration */
-    public static String HOST ;
+    public static String HOST = "localhost:3000";
     public static int PORT = 3000;
     public static final int MAX_THREAD_COUNT = 10;
     public static long EXCHANGE_PERIOD = 600000;
@@ -100,31 +101,35 @@ public class ServerInstance {
             //parse command line arguments
             CommandLine line = parser.parse(options,args);
 
+            ServerSocket server = factory.createServerSocket(PORT);
+
             if(line.hasOption("advertisedhostname")){
                 HOST = line.getOptionValue("advertisedhostname");
-                logger.info("using advertised hostname: "+HOST);
+
             }
             if(line.hasOption("connectionintervallimit")){
                 INTERVAL = Integer.parseInt(line.getOptionValue("connectionintervallimit"));
-                logger.info(String.valueOf("using connection interval limit: "+INTERVAL));
+
             }
             if(line.hasOption("exchangeinterval")){
                 EXCHANGE_PERIOD = Integer.parseInt(line.getOptionValue("exchangeinterval"));
-                logger.info(String.valueOf("using exchange interval period: "+EXCHANGE_PERIOD));
+
             }
             if(line.hasOption("port")){
                 PORT = Integer.parseInt(line.getOptionValue("port"));
-                logger.info(String.valueOf("using port: "+PORT));
             }
             if(line.hasOption("secret")){
                 SECRET = line.getOptionValue("secret");
-                logger.info("using secret: "+SECRET);
-            }
-            DEBUG = line.hasOption("debug");
 
+            }
+
+            DEBUG = line.hasOption("debug");
             if(!DEBUG){logger.setFilter((LogRecord record)->(false));}
 
-            ServerSocket server = factory.createServerSocket(PORT);
+            logger.info("using advertised hostname: "+HOST);
+            logger.info(String.valueOf("using connection interval limit: "+INTERVAL));
+            logger.info(String.valueOf("using exchange interval period: "+EXCHANGE_PERIOD));
+            logger.info("using secret: "+SECRET);
             logger.info("bound to "+PORT);
 
             System.out.println("ServerSocket initialized.");
@@ -133,7 +138,7 @@ public class ServerInstance {
             /* Wait for connections. */
             while (true) {
                 Socket client = server.accept();
-                
+
                 String clientIP = client.getInetAddress().getHostAddress();
                 long currentTime = System.currentTimeMillis();
                 if (!intervalLimit.containsKey(clientIP) || (currentTime - intervalLimit.get(clientIP) > INTERVAL)) {
@@ -141,7 +146,13 @@ public class ServerInstance {
                     intervalLimit.put(clientIP, currentTime);
                     
                     /* Assign a worker thread for this socket. */
-                    threadPool.submit(new WorkerThread(client, fileList, serverList));
+                    try {
+                        threadPool.submit(new WorkerThread(client, fileList, serverList));
+                    }catch (IOException e){
+                        logger.warning(client.getRemoteSocketAddress().toString()+" Cannot create stream");
+                        client.close();
+                    }
+
                 } else {
                     /* Violation */
                     client.close();

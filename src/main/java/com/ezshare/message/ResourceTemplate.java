@@ -107,7 +107,7 @@ public class ResourceTemplate extends Validatable {
 
     @Override
     public boolean isValid() {
-       return owner!=null&&owner.equals("*");
+       return owner!=null&&!owner.equals("*");
     }
 
     @Override

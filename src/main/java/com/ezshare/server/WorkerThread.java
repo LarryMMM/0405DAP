@@ -1,24 +1,8 @@
 package com.ezshare.server;
 
-import java.io.BufferedReader;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.io.RandomAccessFile;
-import java.net.ConnectException;
-import java.net.InetSocketAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.SocketTimeoutException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.io.*;
+import java.net.*;
+import java.util.*;
 import java.util.logging.Logger;
 
 import javax.net.ServerSocketFactory;
@@ -26,6 +10,8 @@ import javax.net.ServerSocketFactory;
 import com.ezshare.log.LogCustomFormatter;
 import com.ezshare.message.*;
 import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
+import org.omg.CORBA.TIMEOUT;
 
 
 /**
@@ -35,649 +21,374 @@ import com.google.gson.Gson;
 public class WorkerThread extends Thread {
 
     private Socket client;
+    private DataOutputStream output;
+    private DataInputStream input;
     private FileList fileList;
     private ServerList serverList;
-    private InputStream w_input;
-    private OutputStream w_output;
-    public static final Logger logger = LogCustomFormatter.getLogger(ServerInstance.class.getName());
+    private String ClientAddress;
+    private Gson gson = new Gson();
 
-    public WorkerThread(Socket client, FileList fileList, ServerList serverList) {
+
+    public WorkerThread(Socket client, FileList fileList, ServerList serverList) throws IOException {
         this.client = client;
+        this.client.setSoTimeout(3000);
         this.fileList = fileList;
         this.serverList = serverList;
+        this.ClientAddress = client.getRemoteSocketAddress().toString();
+        this.input = new DataInputStream(client.getInputStream());
+        this.output = new DataOutputStream(client.getOutputStream());
     }
 
     @Override
     public synchronized void run() {
-        System.out.println("A socket is established!");
-        /*
-        
-            JSON Message Processing...
-            FileTemplate Operations...
-            Passive ServerList Exchange Receiver...
-            Active Query Relay Sender...
-            TO-DO!
-        
-         */
+        try{
+
+            String JSON = input.readUTF();
+
+            Message message = gson.fromJson(JSON,Message.class);
+
+            switch (message.getCommand()){
+                case "PUBLISH":
+                    processPublish(JSON);
+                    break;
+                case "SHARE":
+                    processShare(JSON);
+                    break;
+                case "REMOVE":
+                    processRemove(JSON);
+                    break;
+                case "EXCHANGE":
+                    processExchange(JSON);
+                    break;
+                case "FETCH":
+                    processFetch(JSON);
+                    break;
+                case "QUERY":
+                    processQuery(JSON);
+                    break;
+                default:
+                    ServerInstance.logger.warning(this.ClientAddress+": invalid command");
+                    sendMessage(getErrorMessage("invalid command"));
+            }
+
+        }catch (JsonSyntaxException e){
+            ServerInstance.logger.warning(this.ClientAddress+": missing or incorrect type for command");
+            sendMessage(getErrorMessage("missing or incorrect type for command"));
+        }catch (SocketTimeoutException e){
+            ServerInstance.logger.warning(this.ClientAddress+": Socket Timeout");
+        }catch (IOException e){
+            ServerInstance.logger.warning(this.ClientAddress+": IOException!");}
+        finally {
+            try {
+                client.close();
+            }catch (IOException e){
+                ServerInstance.logger.warning(this.ClientAddress+": IOException!");}
+            }
+        }
+
+    private void processPublish(String JSON){
         try {
-			w_input = client.getInputStream();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-        DataInputStream input = new DataInputStream(w_input);
+            PublishMessage publishMessage = gson.fromJson(JSON,PublishMessage.class);
+            ResourceTemplate r = publishMessage.getResource();
+            r.setEzserver(ServerInstance.HOST);
+
+            if(!publishMessage.isValid()){
+                ServerInstance.logger.warning(this.ClientAddress+": invalid resource");
+                sendMessage(getErrorMessage("invalid resource"));
+
+            }else if(!fileList.add(r)){
+                ServerInstance.logger.warning(this.ClientAddress+": cannot publish resource");
+                sendMessage(getErrorMessage("cannot publish resource"));
+
+            }else {
+                ServerInstance.logger.fine(this.ClientAddress+": resource published!");
+                sendMessage(getSuccessMessage());
+            }
+
+        }catch (JsonSyntaxException e){
+            ServerInstance.logger.warning(this.ClientAddress+": missing resource");
+            sendMessage(getErrorMessage("missing resource"));
+        }
+    }
+
+    private void processRemove(String JSON){
         try {
-			w_output = client.getOutputStream();
-		} catch (IOException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
-		DataOutputStream output = new DataOutputStream(w_output);
+            RemoveMessage removeMessage = gson.fromJson(JSON,RemoveMessage.class);
+            ResourceTemplate r = removeMessage.getResource();
+
+            if(!removeMessage.isValid()){
+                ServerInstance.logger.warning(this.ClientAddress+": invalid resource");
+                sendMessage(getErrorMessage("invalid resource"));
+
+            }else if(!fileList.remove(r)){
+                ServerInstance.logger.warning(this.ClientAddress+": cannot remove resource");
+                sendMessage(getErrorMessage("cannot publish resource"));
+
+            }else {
+                ServerInstance.logger.fine(this.ClientAddress+": resource removed!");
+                sendMessage(getSuccessMessage());
+            }
+
+        }catch (JsonSyntaxException e){
+            ServerInstance.logger.warning(this.ClientAddress+": missing resource");
+            sendMessage(getErrorMessage("missing resource"));
+        }
+    }
+
+    private void processShare(String JSON){
         try {
-			String JSON = input.readUTF();
-			//remove all '\0'
-			JSON = JSON.replaceAll("\0{1,}", "");
-			Gson gson = new Gson();
-			Message message = gson.fromJson(JSON, Message.class);
-			switch(message.getCommand()){
-			case "QUERY":
-				System.out.println("command type: QUERY");
-				QueryMessage queryMessage = gson.fromJson(JSON, QueryMessage.class);
-				procQueryCommand(queryMessage,fileList,serverList,output);
-				break;
-			case "SHARE":
-				System.out.println("command type: SHARE");
-				ShareMessage shareMessage = gson.fromJson(JSON, ShareMessage.class);
-				procShareCommand(shareMessage, fileList,output);
-				break;
-			case "PUBLISH":
-				System.out.println("command type: PUBLISH");
-				PublishMessage publishMessage = gson.fromJson(JSON, PublishMessage.class);
-				procPublishCommand(publishMessage,fileList,output);
-				break;
-			case "REMOVE":
-				System.out.println("command type: REMOVE");
-				RemoveMessage removeMessage = gson.fromJson(JSON, RemoveMessage.class);
-				procRemoveCommand(removeMessage,fileList,output);
-				break;
-			case "EXCHANGE":
-				System.out.println("command type: EXCHANGE");
-				ExchangeMessage exchangeMessage = gson.fromJson(JSON, ExchangeMessage.class);
-				procExchangeCommand(exchangeMessage,serverList,output);
-				break;
-			case "FETCH":
-				System.out.println("command type: FETCH");
-				FetchMessage fetchMessage = gson.fromJson(JSON, FetchMessage.class);
-				procFetchCommand(fetchMessage,fileList,output);
-				break;
-			default:
-				break;		
-			
-			}		
-			
-			
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-        closeAll();
-        
+            ShareMessage shareMessage = gson.fromJson(JSON,ShareMessage.class);
+            ResourceTemplate r = shareMessage.getResource();
+            r.setEzserver(ServerInstance.HOST);
+
+            if (!shareMessage.isValid()){
+                //resource not valid
+                ServerInstance.logger.warning(this.ClientAddress+": invalid resource");
+                sendMessage(getErrorMessage("invalid resource"));
+            }else if(!shareMessage.getSecret().equals(ServerInstance.SECRET)){
+                //secret incorrect
+                ServerInstance.logger.warning(this.ClientAddress+": incorrect secret");
+                sendMessage(getErrorMessage("incorrect secret"));
+            }else{
+                String message;
+                File f = new File(new URI(r.getUri()).getPath());
+                ServerInstance.logger.info(this.ClientAddress+": request for sharing "+r.getUri());
+                if(f.exists()){
+                    //file exist
+                    if(fileList.add(r)){
+                        //file successfully added
+                        ServerInstance.logger.fine(this.ClientAddress+": resource shared!");
+                        message = getSuccessMessage();
+                    }else{
+                        //file exist but cannot be added
+                        ServerInstance.logger.warning(this.ClientAddress+": resource unable to be added!");
+                        message = getErrorMessage("cannot share resource");
+                    }
+                }else {
+                    //file don't exist
+                    ServerInstance.logger.warning(this.ClientAddress+": resource does not exist");
+                    message = getErrorMessage("cannot share resource");
+                }
+                sendMessage(message);
+            }
+
+
+        }catch (JsonSyntaxException e){
+            ServerInstance.logger.warning(this.ClientAddress+": missing resource and/or secret");
+            sendMessage(getErrorMessage("missing resource and/or secret"));
+        }catch (URISyntaxException e){
+            ServerInstance.logger.warning(this.ClientAddress+": unable to create URI");
+            sendMessage(getErrorMessage("cannot share resource"));
+        }
+
     }
-    
-    private void procPublishCommand(PublishMessage publishMessage, FileList fileList,DataOutputStream output){
-    	ResourceTemplate resourceTemplate = publishMessage.getResource();
-    	Map<String, String> responMessage = new HashMap<String, String>();
-    	Gson gson = new Gson();
-    	String JSON="";
-    	//if the resource described by client does not exist
-    	if(resourceTemplate.equals(null)){
-    		responMessage.put("response", "error");
-    		responMessage.put("errorMessage", "missing resource");
-    		JSON = gson.toJson(responMessage);
-    		try {
-				output.writeUTF(JSON);
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-    	}
-    	else{
-    		//if the resource is not valid
-    		if(!publishMessage.isValid()){
-    			responMessage.put("response", "error");
-        		responMessage.put("errorMessage", "invalid resource");
-        		JSON = gson.toJson(responMessage);
-        		try {
-					output.writeUTF(JSON);
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-    		}
-    		else{
-    			// successfully publish a resource
-    			resourceTemplate.setEzserver(ServerInstance.HOST+":"+ServerInstance.PORT);
-    			if(fileList.add(resourceTemplate)){
-    				responMessage.put("response", "success");
-    				JSON = gson.toJson(responMessage);
-    				try {
-						output.writeUTF(JSON);
-					} catch (IOException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-    			}
-    			//if the resource contradicts with another resource(same channel,same URI but different owner)
-    			else{
-    				responMessage.put("response", "error");
-            		responMessage.put("errorMessage", "cannot publish resource");
-            		JSON = gson.toJson(responMessage);
-            		try {
-						output.writeUTF(JSON);
-					} catch (IOException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-    			}
-    		}
-    	}
+
+    private void processExchange(String JSON){
+        try {
+            ExchangeMessage exchangeMessage = gson.fromJson(JSON,ExchangeMessage.class);
+            List<Host> serverList = exchangeMessage.getServerList();
+            boolean record_valid = true;
+            for (Host h : serverList) {
+                if(!h.isValid()){
+                    record_valid=false;
+                    break;
+                }
+            }
+            if (record_valid){
+                this.serverList.updateServerList(serverList);
+                ServerInstance.logger.fine(this.ClientAddress+": servers added");
+                sendMessage(getSuccessMessage());
+            }else {
+                sendMessage(getErrorMessage("invalid server record"));
+            }
+
+        }catch (JsonSyntaxException e){
+            ServerInstance.logger.warning(this.ClientAddress+": missing resource");
+            sendMessage(getErrorMessage("missing resource"));
+        }
+
     }
-    
-    
-    private void procShareCommand(ShareMessage shareMessage, FileList fileList,DataOutputStream output){
-    	ResourceTemplate resourceTemplate = shareMessage.getResource();
-    	Map<String, String> responMessage = new HashMap<String, String>();
-    	Gson gson = new Gson();
-    	String JSON="";
-    	//if the resource described by client does not exist
-    	if(resourceTemplate.equals(null)||shareMessage.getSecret().equals(null)){    		
-    		responMessage.put("response", "error");
-    		responMessage.put("errorMessage", "missing resource and/or secret");
-    		JSON = gson.toJson(responMessage);
-    		try {
-				output.writeUTF(JSON);
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-    	}
-    	else{
-    		//if the resource is not valid
-    		if(!shareMessage.isValid()){
-    			responMessage.put("response", "error");
-        		responMessage.put("errorMessage", "invalid resource");
-        		JSON = gson.toJson(responMessage);
-        		try {
-					output.writeUTF(JSON);
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-    		}
-    		else{
-    			if(shareMessage.getSecret()!=ServerInstance.SECRET){
-    				responMessage.put("response", "error");
-            		responMessage.put("errorMessage", "incorrect secret");
-            		JSON = gson.toJson(responMessage);
-            		try {
-						output.writeUTF(JSON);
-					} catch (IOException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-    			} 
-    			else{
-    				// successfully publish a resource
-    				resourceTemplate.setEzserver(ServerInstance.HOST+":"+ServerInstance.PORT);
-        			if(fileList.add(resourceTemplate)){
-        				responMessage.put("response", "success");
-        				JSON = gson.toJson(responMessage);
-        				try {
-    						output.writeUTF(JSON);
-    					} catch (IOException e) {
-    						// TODO Auto-generated catch block
-    						e.printStackTrace();
-    					}
-        			}
-        			//if the resource contradicts with another resource(same channel,same URI but different owner)
-        			else{
-        				responMessage.put("response", "error");
-                		responMessage.put("errorMessage", "cannot share resource");
-                		JSON = gson.toJson(responMessage);
-                		try {
-    						output.writeUTF(JSON);
-    					} catch (IOException e) {
-    						// TODO Auto-generated catch block
-    						e.printStackTrace();
-    					}
-        			}
-    				
-    			}
-    			    			
-    			
-    		}
-    	}
-    	
-    } 
-    private void procRemoveCommand(RemoveMessage removeMessage, FileList fileList,DataOutputStream output){
-    	ResourceTemplate resourceTemplate = removeMessage.getResource();
-    	Map<String, String> responMessage = new HashMap<String, String>();
-    	Gson gson = new Gson();
-    	String JSON="";
-    	//if the resource described by client does not exist
-    	if(resourceTemplate.equals(null)){
-    		responMessage.put("response", "error");
-    		responMessage.put("errorMessage", "missing resource");
-    		JSON = gson.toJson(responMessage);
-    		try {
-				output.writeUTF(JSON);
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-    	}
-    	else{
-    		//if the resource is not valid
-    		if(!removeMessage.isValid()){
-    			responMessage.put("response", "error");
-        		responMessage.put("errorMessage", "invalid resource");
-        		JSON = gson.toJson(responMessage);
-        		try {
-					output.writeUTF(JSON);
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-    		}
-    		else{
-    			// successfully remove a resource
-    			if(fileList.remove(resourceTemplate)){
-    				responMessage.put("response", "success");
-    				JSON = gson.toJson(responMessage);
-    				try {
-						output.writeUTF(JSON);
-					} catch (IOException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-    			}
-    			else{
-    				responMessage.put("response", "error");
-            		responMessage.put("errorMessage", "cannot remove resource");
-            		JSON = gson.toJson(responMessage);
-            		try {
-						output.writeUTF(JSON);
-					} catch (IOException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-    			}
-    		}
-    	}
-    } 
-    private void procQueryCommand(QueryMessage queryMessage, FileList fileList,ServerList serverList,DataOutputStream output){
-    	ResourceTemplate resourceTemplate = queryMessage.getResourceTemplate();
-    	Map<String, String> responMessage = new HashMap<String, String>();
-    	Gson gson = new Gson();
-    	String JSON="";
-    	//if the resource does not exist
-    	if(resourceTemplate.equals(null)){
-    		responMessage.put("response", "error");
-    		responMessage.put("errorMessage", "missing resourceTemplate");
-    		JSON = gson.toJson(responMessage);
-    		try {
-				output.writeUTF(JSON);
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-    	}
-    	else{
-    		//if the resource is not valid
-    		if(!queryMessage.isValid()){
-    			responMessage.put("response", "error");
-        		responMessage.put("errorMessage", "invalid resourceTemplate");
-        		JSON = gson.toJson(responMessage);
-        		try {
-					output.writeUTF(JSON);
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-    		}
-    		else{
-    			// successfully fetch a resource
-    			List<ResourceTemplate> result = new ArrayList<>();
-    			if(queryMessage.isRelay()){
-    				List<Host> hostList = serverList.getServerList();
-    				int TIME_OUT = 3000;
-    				//send query to servers in list
-    				for(Host host: hostList){
-    					Socket socket = new Socket();
-    					try {
-							socket.connect(new InetSocketAddress(host.getHostname(),host.getPort()),TIME_OUT);
-							/* Set timeout for read() (also readUTF()!), throwing SocketTimeoutException */
-			                socket.setSoTimeout(TIME_OUT);
-						} catch (ConnectException ex) {
-			                ServerInstance.logger.warning(host.toString() + " connection timeout");
-			                serverList.removeServer(host);
-			            } catch (SocketTimeoutException ex) {
-			                ServerInstance.logger.warning(host.toString() + " readUTF() timeout");
-			                serverList.removeServer(host);
-			            } catch (IOException ex) {
-			                /* Unclassified exception */
-			                ServerInstance.logger.warning(host.toString() + " IOException");
-			                serverList.removeServer(host);
-			            }    					
-    		            try {    		            	
-    		            	
-							DataOutputStream s_output = new DataOutputStream(socket.getOutputStream());
-							ResourceTemplate queryRT = queryMessage.getResourceTemplate();
-							queryRT.setChannel("");
-							queryRT.setOwner("");
-							QueryMessage relayQueryMessage = new QueryMessage(queryRT,false);
-							JSON = gson.toJson(relayQueryMessage);
-							s_output.writeUTF(JSON);
-						} catch (IOException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-    		            
-    		            
-    		            DataInputStream input = null;
-						try {
-							input = new DataInputStream(socket.getInputStream());
-						} catch (IOException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-    		            String response="";
-						try {
-							response = input.readUTF();
-						} catch (IOException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-    		            //receive response
-    		            if(response.contains("success")){
-    		                //if success 
-    		                try {
-								response = input.readUTF();
-							} catch (IOException e) {
-								// TODO Auto-generated catch block
-								e.printStackTrace();
-							} //discard success message
-    		                while (!response.contains("resultSize")){
-    		                    //print out resources
-    		                    ResourceTemplate r = gson.fromJson(response,ResourceTemplate.class);
-    		                    result.add(r);
-    		                    try {
-									response = input.readUTF();
-								} catch (IOException e) {
-									// TODO Auto-generated catch block
-									e.printStackTrace();
-								}
-    		                }
-    		                
-    		            }else if(response.contains("error")){
-    		                //when error occur
-    		                logger.warning("RECEIVED:"+response);
-    		            }
-    		            try {
-							socket.close();
-						} catch (IOException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-    		        }
-    				
-    				
-    				responMessage.put("response", "success");
-    				JSON = gson.toJson(responMessage);
-    				try {
-						output.writeUTF(JSON);
-					} catch (IOException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-    				for(ResourceTemplate rt: result){
-    					JSON = gson.toJson(rt);
-        				try {
-							output.writeUTF(JSON);
-						} catch (IOException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-    				}
-    				
-    				try {
-						output.writeUTF("{\"resultSize\" : "+result.size()+"}");
-					} catch (IOException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-    				
-    				
-    			} 
-    			
-    		
-    		else {
-    				List<ResourceTemplate> queryList = fileList.query(resourceTemplate);
-        			int resultSize = queryList.size();
-        			responMessage.put("response", "success");
-    				JSON = gson.toJson(responMessage);
-    				try {
-    					output.writeUTF(JSON);
-    				} catch (IOException e) {
-    					// TODO Auto-generated catch block
-    					e.printStackTrace();
-    				}
-        			if(resultSize==0){
-        				try {
-    						output.writeUTF("{\"resultSize\" : "+resultSize+"}");
-    					} catch (IOException e) {
-    						// TODO Auto-generated catch block
-    						e.printStackTrace();
-    					}
-        			}
-        			else{
-        				for(ResourceTemplate rt : queryList){    					
-        					if(!rt.getOwner().isEmpty()){
-        						rt.setOwner("");
-        					}   
-        					String resource = gson.toJson(rt);
-        					try {
-    							output.writeUTF(resource);
-    						} catch (IOException e) {
-    							// TODO Auto-generated catch block
-    							e.printStackTrace();
-    						}
-        				}
-        				try {
-    						output.writeUTF("{\"resultSize\" : "+resultSize+"}");
-    					} catch (IOException e) {
-    						// TODO Auto-generated catch block
-    						e.printStackTrace();
-    					}
-        			}
-    			}
-    			
-    			
-    			
-    		
-    		}
-    	}
+
+    public void processQuery(String JSON){
+        try {
+            QueryMessage queryMessage = gson.fromJson(JSON,QueryMessage.class);
+            ResourceTemplate r = queryMessage.getResourceTemplate();
+
+            ServerInstance.logger.info("isRelay: "+queryMessage.isRelay());
+            ServerInstance.logger.info("isValid: "+queryMessage.isValid());
+            ServerInstance.logger.info(client.getRemoteSocketAddress()+" querying for "+r.toString());
+
+            if(!queryMessage.isValid()){
+                ServerInstance.logger.warning(this.ClientAddress+": invalid resourceTemplate");
+                sendMessage(getErrorMessage("invalid resourceTemplate"));
+            }else if(!queryMessage.isRelay()){
+                //relay is false,only query local resource
+                List<ResourceTemplate> result = this.fileList.query(r);
+
+                sendMessage(getSuccessMessage());
+
+                ServerInstance.logger.fine("Query Success");
+
+                if(!result.isEmpty()) {
+                    for (ResourceTemplate rt : result) {
+                        sendMessage(((ResourceTemplate) rt).toString());
+                    }
+                }
+                sendMessage(getresultSize(((long) result.size())));
+            }else {
+                //relay is true, query local resource first
+                List<ResourceTemplate> result = this.fileList.query(r);
+
+                QueryMessage relayMessage = gson.fromJson(JSON,QueryMessage.class);
+
+                relayMessage.setRelay(false);
+                relayMessage.getResourceTemplate().setOwner("");
+                relayMessage.getResourceTemplate().setChannel("");
+
+                //append result set by querying remote servers
+                for (Host h:this.serverList.getServerList()) {
+                    List<ResourceTemplate> rtl = queryRelay(h,relayMessage);
+                    result.addAll(rtl);
+                }
+                sendMessage(getSuccessMessage());
+                for (ResourceTemplate rt: result) {
+                    sendMessage(((ResourceTemplate)rt).toString());
+                }
+                sendMessage(getresultSize(((long) result.size())));
+
+            }
+
+        }catch (JsonSyntaxException e){
+            ServerInstance.logger.warning(this.ClientAddress+": missing resourceTemplate");
+            sendMessage(getErrorMessage("missing resourceTemplate"));
+        }
+
     }
-    private void procFetchCommand(FetchMessage fetchMessage, FileList fileList,DataOutputStream output){
-    	ResourceTemplate resourceTemplate = fetchMessage.getResource();
-    	Map<String, String> responMessage = new HashMap<String, String>();
-    	Gson gson = new Gson();
-    	String JSON="";
-    	//if the resource does not exist
-    	if(resourceTemplate.equals(null)){
-    		responMessage.put("response", "error");
-    		responMessage.put("errorMessage", "missing resourceTemplate");
-    		JSON = gson.toJson(responMessage);
-    		
-    	}
-    	else{
-    		//if the resource is not valid
-    		if(!fetchMessage.isValid()){
-    			responMessage.put("response", "error");
-        		responMessage.put("errorMessage", "invalid resourceTemplate");
-        		JSON = gson.toJson(responMessage);
-        		try {
-					output.writeUTF(JSON);
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-    		}
-    		else{
-    			// to fetch a resource
-    			List<ResourceTemplate> queryList = fileList.query(resourceTemplate);
-    			int resultSize = queryList.size();
-    			responMessage.put("response", "success");
-				JSON = gson.toJson(responMessage);
-				try {
-					output.writeUTF(JSON);
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-				//if there is not a file described by client existing in this server
-    			if(resultSize==0){
-    				JSON = "{\"resultSize\" : "+resultSize+"}";
-    				try {
-						output.writeUTF(JSON);
-					} catch (IOException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-    			}
-    			//send the file to client
-    			else{
-    				ResourceTemplate rt = queryList.get(0);
-					if(!rt.getOwner().isEmpty()){
-						rt.setOwner("");
-					}
-					String resource = gson.toJson(rt);
-					try {
-						output.writeUTF(resource);
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
-					sendFile(rt.getUri(), output);    	
-    				JSON = "{\"resultSize\" : "+resultSize+"}";
-    				try {
-						output.writeUTF(JSON);
-					} catch (IOException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-    				
-    			}
-    			
-    		}
-    	}
+
+    private void processFetch(String JSON){
+        try{
+            FetchMessage fetchMessage = gson.fromJson(JSON,FetchMessage.class);
+            ResourceTemplate r = fetchMessage.getResource();
+
+            if(!fetchMessage.isValid()){
+                ServerInstance.logger.warning(this.ClientAddress+": invalid resourceTemplate");
+                sendMessage(getErrorMessage("invalid resourceTemplate"));
+            }else{
+                List<ResourceTemplate> reuslt = this.fileList.query(r);
+                if(!reuslt.isEmpty()){
+                    sendMessage(getSuccessMessage());
+                    RandomAccessFile file = new RandomAccessFile(new File(new URI(r.getUri()).getPath()),"r");
+
+                    sendMessage(gson.toJson(new FileTemplate(reuslt.get(0),file.length())));
+
+                    byte[] sendingBuffer = new byte[1024*1024];
+                    int num;
+                    // While there are still bytes to send..
+                    while((num = file.read(sendingBuffer)) > 0){
+                        output.write(Arrays.copyOf(sendingBuffer, num));
+                    }
+                    file.close();
+                    sendMessage(getresultSize((long)1));
+                }else {
+                    sendMessage(getSuccessMessage());
+                    sendMessage(getresultSize((long)0));
+                }
+            }
+
+
+        }catch (JsonSyntaxException e){
+            ServerInstance.logger.warning(this.ClientAddress+": missing resourceTemplate");
+            sendMessage(getErrorMessage("missing resourceTemplate"));
+        }catch (FileNotFoundException e){
+            ServerInstance.logger.warning(this.ClientAddress+": file not found");
+            sendMessage(getErrorMessage("file not found"));
+        }catch (IOException e){
+            ServerInstance.logger.warning(this.ClientAddress+": IOException when fetching");
+        }catch (URISyntaxException e){
+            ServerInstance.logger.warning(this.ClientAddress+": unable to create URI");
+            sendMessage(getErrorMessage("cannot fetch resource"));
+        }
     }
-    
-    
-    private void procExchangeCommand(ExchangeMessage exchangeMessage,ServerList serverList,DataOutputStream output ){
-    	List<Host> hostList = exchangeMessage.getServerList();
-    	Map<String, String> responMessage = new HashMap<String, String>();
-    	Gson gson = new Gson();
-    	String JSON="";
-    	//if the resource does not exist
-    	if(hostList.equals(null)){
-    		responMessage.put("response", "error");
-    		responMessage.put("errorMessage", "missing server list");
-    		JSON = gson.toJson(responMessage);
-    		try {
-				output.writeUTF(JSON);
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-    	}
-    	else{
-    		//if the resource is not valid
-    		if(!exchangeMessage.isValid()){
-    			responMessage.put("response", "error");
-        		responMessage.put("errorMessage", "missing or invalid server list");
-        		JSON = gson.toJson(responMessage);
-        		try {
-					output.writeUTF(JSON);
-				} catch (IOException e1) {
-					// TODO Auto-generated catch block
-					e1.printStackTrace();
-				}
-        		
-    		}
-    		else{
-    			// successfully fetch a resource
-    			responMessage.put("response", "success");
-				JSON = gson.toJson(responMessage);
-				try {
-					output.writeUTF(JSON);
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-    			serverList.updateServerList(hostList);
-    			
-    				
-    			
-    			
-    		}
-    	}
+
+
+    private String getErrorMessage(String errorMessage){
+        Map<String,String> response = new LinkedHashMap<>();
+        response.put("response","error");
+        response.put("errorMessage",errorMessage);
+        return gson.toJson(response,LinkedHashMap.class);
     }
-    
-    private void sendFile(String uri, DataOutputStream output ){
-    	File f = new File(uri);
-		if(f.exists()){
-						
-			try {			
-				
-				// Start sending file
-				RandomAccessFile byteFile = new RandomAccessFile(f,"r");
-				byte[] sendingBuffer = new byte[1024*1024];
-				int num;
-				// While there are still bytes to send..
-				while((num = byteFile.read(sendingBuffer)) > 0){
-					output.write(Arrays.copyOf(sendingBuffer, num));
-				}
-				byteFile.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
+
+    private String getSuccessMessage(){
+        Map<String,String> response = new LinkedHashMap<>();
+        response.put("response","success");
+        return gson.toJson(response,LinkedHashMap.class);
     }
-    
-    private void closeAll() {
-		if (w_input != null) {
-			try {
-				w_input.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-			w_input = null;
-		}
-		if (w_output != null) {
-			try {
-				w_output.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-			w_output = null;
-		}
-		if (client != null) {
-			try {
-				client.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-			client = null;
-		}
-	}
+
+    private String getresultSize(Long resultSize){
+        Map<String,Long> response = new LinkedHashMap<>();
+        response.put("resultSize",resultSize);
+        return gson.toJson(response,LinkedHashMap.class);
+    }
+
+    private boolean sendMessage(String JSON){
+        try {
+            output.writeUTF(JSON);
+            output.flush();
+            return true;
+        }catch (IOException e){
+            ServerInstance.logger.warning(this.ClientAddress+": IOException when sending message!");
+            return false;}
+    }
+
+    public List<ResourceTemplate> queryRelay(Host host,QueryMessage queryMessage){
+
+        List<ResourceTemplate> result = new ArrayList<>();
+
+        try(Socket socket = new Socket(host.getHostname(),host.getPort())) {
+
+            ServerInstance.logger.fine("querying to "+socket.getRemoteSocketAddress().toString());
+
+            socket.setSoTimeout(3000);
+
+            DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+            DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
+
+            String JSON = gson.toJson(queryMessage);
+
+            outputStream.writeUTF(JSON);
+            outputStream.flush();
+
+            String response = inputStream.readUTF();
+
+            if(response.contains("success")){
+                response = inputStream.readUTF(); //discard success message
+                while (!response.contains("resultSize")){
+                    ResourceTemplate r = gson.fromJson(response,ResourceTemplate.class);
+                    if(!r.getOwner().equals("")){
+                        r.setOwner("*");
+                    }
+                    result.add(r);
+                    response = inputStream.readUTF();
+                }
+            }else {
+                ServerInstance.logger.warning(response);
+            }
+            socket.close();
+
+        }catch (SocketTimeoutException e){
+            ServerInstance.logger.warning(host.toString()+" timeout when query relay");
+            this.serverList.removeServer(host);
+        }catch (ConnectException e){
+            ServerInstance.logger.warning(host.toString()+" timeout when create relay socket");
+            this.serverList.removeServer(host);
+        }
+        catch (IOException e){
+            ServerInstance.logger.warning(host.toString()+" IOEXCEPTION when query relay");
+            this.serverList.removeServer(host);
+        }
+       return result;
+    }
+
+
+
 }

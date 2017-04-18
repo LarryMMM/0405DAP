@@ -315,7 +315,7 @@ public class Client {
                 if(debug) logger.fine("RECEIVE:"+file_template);
                 FileTemplate receivedFileTemplate = gson.fromJson(file_template,FileTemplate.class);
 
-                int resource_size = receivedFileTemplate.getResourceSize();
+                int resource_size = (int)receivedFileTemplate.getResourceSize();
 
                 byte[] download = new byte[resource_size];
 
