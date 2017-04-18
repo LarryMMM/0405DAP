@@ -84,6 +84,8 @@ public class WorkerThread extends Thread {
 				break;
 			case "SHARE":
 				System.out.println("command type: SHARE");
+				ShareMessage shareMessage = gson.fromJson(JSON, ShareMessage.class);
+				procShareCommand(shareMessage, fileList,output);
 				break;
 			case "PUBLISH":
 				System.out.println("command type: PUBLISH");
@@ -184,10 +186,9 @@ public class WorkerThread extends Thread {
     	Gson gson = new Gson();
     	String JSON="";
     	//if the resource described by client does not exist
-    	if(resourceTemplate.equals(null)){
-    		
+    	if(resourceTemplate.equals(null)||shareMessage.getSecret().equals(null)){    		
     		responMessage.put("response", "error");
-    		responMessage.put("errorMessage", "missing resource");
+    		responMessage.put("errorMessage", "missing resource and/or secret");
     		JSON = gson.toJson(responMessage);
     		try {
 				output.writeUTF(JSON);
@@ -210,21 +211,9 @@ public class WorkerThread extends Thread {
 				}
     		}
     		else{
-    			// successfully publish a resource
-    			if(fileList.add(resourceTemplate)){
-    				responMessage.put("response", "success");
-    				JSON = gson.toJson(responMessage);
-    				try {
-						output.writeUTF(JSON);
-					} catch (IOException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-    			}
-    			//if the resource contradicts with another resource(same channel,same URI but different owner)
-    			else{
+    			if(shareMessage.getSecret()!=ServerInstance.SECRET){
     				responMessage.put("response", "error");
-            		responMessage.put("errorMessage", "cannot publish resource");
+            		responMessage.put("errorMessage", "incorrect secret");
             		JSON = gson.toJson(responMessage);
             		try {
 						output.writeUTF(JSON);
@@ -232,7 +221,35 @@ public class WorkerThread extends Thread {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
 					}
+    			} 
+    			else{
+    				// successfully publish a resource
+        			if(fileList.add(resourceTemplate)){
+        				responMessage.put("response", "success");
+        				JSON = gson.toJson(responMessage);
+        				try {
+    						output.writeUTF(JSON);
+    					} catch (IOException e) {
+    						// TODO Auto-generated catch block
+    						e.printStackTrace();
+    					}
+        			}
+        			//if the resource contradicts with another resource(same channel,same URI but different owner)
+        			else{
+        				responMessage.put("response", "error");
+                		responMessage.put("errorMessage", "cannot share resource");
+                		JSON = gson.toJson(responMessage);
+                		try {
+    						output.writeUTF(JSON);
+    					} catch (IOException e) {
+    						// TODO Auto-generated catch block
+    						e.printStackTrace();
+    					}
+        			}
+    				
     			}
+    			    			
+    			
     		}
     	}
     	
@@ -402,7 +419,14 @@ public class WorkerThread extends Thread {
     		                //when error occur
     		                logger.warning("RECEIVED:"+response);
     		            }
+    		            try {
+							socket.close();
+						} catch (IOException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
     		        }
+    				
     				
     				responMessage.put("response", "success");
     				JSON = gson.toJson(responMessage);
@@ -430,7 +454,8 @@ public class WorkerThread extends Thread {
 					}
     				
     				
-    			}  				
+    			} 
+    			
     		
     		else {
     				List<ResourceTemplate> queryList = fileList.query(resourceTemplate);
