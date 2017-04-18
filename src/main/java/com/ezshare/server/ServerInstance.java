@@ -18,7 +18,7 @@ import javax.net.ServerSocketFactory;
 
 /**
  *
- * @author Wenhao Zhao
+ * @author Wenhao Zhao, Ying Li
  */
 public class ServerInstance {
 
@@ -121,7 +121,7 @@ public class ServerInstance {
                 logger.info("using secret: "+SECRET);
             }
             DEBUG = line.hasOption("debug");
-           
+
 
             System.out.println("ServerSocket initialized.");
             System.out.println("Waiting for client connection..");
