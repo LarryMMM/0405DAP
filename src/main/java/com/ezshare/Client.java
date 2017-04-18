@@ -49,7 +49,7 @@ public class Client {
         options.addOption("query", false, "query for resources from server");
         options.addOption("remove", false, "remove resource from server");
         options.addOption("secret", true, "secret");
-        options.addOption("servers", true, "secret");
+        options.addOption("servers", true, "server list, host1:port1,host2:port2,...");
         options.addOption("share", false, "share resource on server");
         options.addOption("tags", true, "resource tags, tag1,tag2,tag3,...");
         options.addOption("uri", true, "resource URI");
