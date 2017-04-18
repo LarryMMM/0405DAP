@@ -21,9 +21,8 @@ public class FileList {
     /**
      * add a new file to filelist
      *
-     *
-     * @param ResourceTemplate
-     * @return boolean
+     * @param resourceTemplate Resource to be added.
+     * @return boolean  Whether the resource is successfully added.
      *
      * */
     public boolean add(ResourceTemplate resourceTemplate) {
@@ -58,8 +57,8 @@ public class FileList {
      * delete a file from filelist
      *
      *
-     * @param ResourceTemplate
-     * @return boolean
+     * @param resourceTemplate  Resource to be removed.
+     * @return boolean  Whether the resource is successfully removed.
      *
      * */
     public boolean remove(ResourceTemplate resourceTemplate) {
@@ -83,8 +82,8 @@ public class FileList {
      * search a certain list of file by owner, uri and channel in filelist
      *
      *
-     * @param ResourceTemplate
-     * @return querylist
+     * @param resourceTemplate  Resource in query.
+     * @return querylist    List of resources that match the query.
      *
      * */
     public List<ResourceTemplate> query(ResourceTemplate resourceTemplate) {
