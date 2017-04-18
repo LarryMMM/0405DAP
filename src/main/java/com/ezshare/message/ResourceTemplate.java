@@ -63,6 +63,18 @@ public class ResourceTemplate extends Validatable {
         return tags;
     }
 
+    public void setChannel(String channel) {
+        this.channel = channel;
+    }
+
+    public void setOwner(String owner) {
+        this.owner = owner;
+    }
+
+    public void setEzserver(String ezserver) {
+        this.ezserver = ezserver;
+    }
+
     /**
      * Check whether the uri is valid for publish or query.
      * @return  Validation.
