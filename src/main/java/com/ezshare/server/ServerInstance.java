@@ -13,6 +13,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.logging.Filter;
+import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import javax.net.ServerSocketFactory;
 
@@ -94,7 +96,9 @@ public class ServerInstance {
         CommandLineParser parser = new DefaultParser();
         Options options = commandOptions();
 
-        try (ServerSocket server = factory.createServerSocket(PORT)) {
+
+
+        try {
             //parse command line arguments
             CommandLine line = parser.parse(options,args);
 
@@ -122,6 +126,10 @@ public class ServerInstance {
             }
             DEBUG = line.hasOption("debug");
 
+            if(!DEBUG){logger.setFilter((LogRecord record)->(false));}
+
+            ServerSocket server = factory.createServerSocket(PORT);
+            logger.info("bound to "+PORT);
 
             System.out.println("ServerSocket initialized.");
             System.out.println("Waiting for client connection..");

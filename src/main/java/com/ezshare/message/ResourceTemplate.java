@@ -63,6 +63,14 @@ public class ResourceTemplate extends Validatable {
         return tags;
     }
 
+    public void setEzserver(String ezserver) {
+        this.ezserver = ezserver;
+    }
+
+    public void encryptOwner(String owner) {
+        this.owner = "*";
+    }
+
     /**
      * Check whether the uri is valid for publish or query.
      * @return  Validation.
