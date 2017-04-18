@@ -96,13 +96,9 @@ public class ServerInstance {
         CommandLineParser parser = new DefaultParser();
         Options options = commandOptions();
 
-
-
         try {
             //parse command line arguments
             CommandLine line = parser.parse(options,args);
-
-
 
             if(line.hasOption("advertisedhostname")){
                 HOST = line.getOptionValue("advertisedhostname");

@@ -7,11 +7,14 @@ package com.ezshare.message;
  */
 public class QueryMessage extends Message {
 
-    private final boolean relay;
+    private boolean relay;
     private final ResourceTemplate resourceTemplate;
 
+    public void setRelay(boolean relay) {
+        this.relay = relay;
+    }
 
-    public QueryMessage(ResourceTemplate resourceTemplate,boolean relay){
+    public QueryMessage(ResourceTemplate resourceTemplate, boolean relay){
         super("QUERY");
         this.resourceTemplate = resourceTemplate;
         this.relay = relay;

@@ -14,6 +14,8 @@ hs_err_pid*
 
 ### Eclpise ###
 
+.classpath
+.project
 .metadata
 bin/
 tmp/

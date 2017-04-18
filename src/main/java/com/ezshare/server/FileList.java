@@ -3,7 +3,12 @@ package com.ezshare.server;
 import com.ezshare.message.FileTemplate;
 import com.ezshare.message.ResourceTemplate;
 
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -100,4 +105,6 @@ public class FileList {
             lock.readLock().unlock();
         }
     }
+    
+    
 }
