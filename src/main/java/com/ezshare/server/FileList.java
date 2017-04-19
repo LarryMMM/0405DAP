@@ -96,7 +96,7 @@ public class FileList {
         List<ResourceTemplate> queryList = new ArrayList<>();
         try{
             for(ResourceTemplate f : resourceTemplateList) {
-                if (f.match(resourceTemplate)) {
+                if (resourceTemplate.match(f)) {
                     queryList.add(f);
                 }
             }
