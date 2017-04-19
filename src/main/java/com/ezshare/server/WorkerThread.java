@@ -3,15 +3,11 @@ package com.ezshare.server;
 import java.io.*;
 import java.net.*;
 import java.util.*;
-import java.util.logging.Logger;
 
-import javax.net.ServerSocketFactory;
-
-import com.ezshare.log.LogCustomFormatter;
 import com.ezshare.message.*;
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
-import org.omg.CORBA.TIMEOUT;
+
 
 
 /**
@@ -42,8 +38,9 @@ public class WorkerThread extends Thread {
     @Override
     public synchronized void run() {
         try{
-
-            String JSON = input.readUTF();
+            ServerInstance.logger.info(this.ClientAddress+": Connected!");
+            //remove \0 in order to prevent crashing.
+            String JSON = input.readUTF().replace("\0","");
 
             Message message = gson.fromJson(JSON,Message.class);
 
@@ -81,8 +78,9 @@ public class WorkerThread extends Thread {
         finally {
             try {
                 client.close();
+                ServerInstance.logger.info(this.ClientAddress+": Disconnected!");
             }catch (IOException e){
-                ServerInstance.logger.warning(this.ClientAddress+": IOException!");}
+                ServerInstance.logger.warning(this.ClientAddress+": Unable to disconnect!");}
             }
         }
 
@@ -187,18 +185,14 @@ public class WorkerThread extends Thread {
         try {
             ExchangeMessage exchangeMessage = gson.fromJson(JSON,ExchangeMessage.class);
             List<Host> serverList = exchangeMessage.getServerList();
-            boolean record_valid = true;
-            for (Host h : serverList) {
-                if(!h.isValid()){
-                    record_valid=false;
-                    break;
-                }
-            }
-            if (record_valid){
+
+            if (exchangeMessage.isValid()){
+                //all servers valid, add to server list.
                 this.serverList.updateServerList(serverList);
                 ServerInstance.logger.fine(this.ClientAddress+": servers added");
                 sendMessage(getSuccessMessage());
             }else {
+
                 sendMessage(getErrorMessage("invalid server record"));
             }
 
@@ -214,8 +208,6 @@ public class WorkerThread extends Thread {
             QueryMessage queryMessage = gson.fromJson(JSON,QueryMessage.class);
             ResourceTemplate r = queryMessage.getResourceTemplate();
 
-            ServerInstance.logger.info("isRelay: "+queryMessage.isRelay());
-            ServerInstance.logger.info("isValid: "+queryMessage.isValid());
             ServerInstance.logger.info(client.getRemoteSocketAddress()+" querying for "+r.toString());
 
             if(!queryMessage.isValid()){
@@ -231,10 +223,10 @@ public class WorkerThread extends Thread {
 
                 if(!result.isEmpty()) {
                     for (ResourceTemplate rt : result) {
-                        sendMessage(((ResourceTemplate) rt).toString());
+                        sendMessage(rt.toString());
                     }
                 }
-                sendMessage(getresultSize(((long) result.size())));
+                sendMessage(getResultSize(((long) result.size())));
             }else {
                 //relay is true, query local resource first
                 List<ResourceTemplate> result = this.fileList.query(r);
@@ -250,12 +242,13 @@ public class WorkerThread extends Thread {
                     List<ResourceTemplate> rtl = queryRelay(h,relayMessage);
                     result.addAll(rtl);
                 }
+
                 sendMessage(getSuccessMessage());
                 for (ResourceTemplate rt: result) {
-                    sendMessage(((ResourceTemplate)rt).toString());
+                    sendMessage(rt.toString());
                 }
-                sendMessage(getresultSize(((long) result.size())));
-
+                sendMessage(getResultSize(((long) result.size())));
+                ServerInstance.logger.fine("Query relay Success");
             }
 
         }catch (JsonSyntaxException e){
@@ -274,28 +267,30 @@ public class WorkerThread extends Thread {
                 ServerInstance.logger.warning(this.ClientAddress+": invalid resourceTemplate");
                 sendMessage(getErrorMessage("invalid resourceTemplate"));
             }else{
-                List<ResourceTemplate> reuslt = this.fileList.query(r);
-                if(!reuslt.isEmpty()){
-                    sendMessage(getSuccessMessage());
-                    RandomAccessFile file = new RandomAccessFile(new File(new URI(r.getUri()).getPath()),"r");
+                List<ResourceTemplate> result = this.fileList.query(r);
 
-                    sendMessage(gson.toJson(new FileTemplate(reuslt.get(0),file.length())));
+                if(!result.isEmpty()){
+                    RandomAccessFile file = new RandomAccessFile(new File(new URI(r.getUri()).getPath()),"r");
+                    //file is exist.
+                    sendMessage(getSuccessMessage());
+                    sendMessage(gson.toJson(new FileTemplate(result.get(0),file.length())));
 
                     byte[] sendingBuffer = new byte[1024*1024];
                     int num;
                     // While there are still bytes to send..
+                    ServerInstance.logger.info(this.ClientAddress+": start sending file "+r.getUri());
                     while((num = file.read(sendingBuffer)) > 0){
                         output.write(Arrays.copyOf(sendingBuffer, num));
                     }
                     file.close();
-                    sendMessage(getresultSize((long)1));
+                    sendMessage(getResultSize((long)1));
+                    ServerInstance.logger.fine(this.ClientAddress+": successfully sent "+r.getUri());
                 }else {
                     sendMessage(getSuccessMessage());
-                    sendMessage(getresultSize((long)0));
+                    sendMessage(getResultSize((long)0));
+                    ServerInstance.logger.fine(this.ClientAddress+": no matched file");
                 }
             }
-
-
         }catch (JsonSyntaxException e){
             ServerInstance.logger.warning(this.ClientAddress+": missing resourceTemplate");
             sendMessage(getErrorMessage("missing resourceTemplate"));
@@ -310,7 +305,6 @@ public class WorkerThread extends Thread {
         }
     }
 
-
     private String getErrorMessage(String errorMessage){
         Map<String,String> response = new LinkedHashMap<>();
         response.put("response","error");
@@ -324,20 +318,19 @@ public class WorkerThread extends Thread {
         return gson.toJson(response,LinkedHashMap.class);
     }
 
-    private String getresultSize(Long resultSize){
+    private String getResultSize(Long resultSize){
         Map<String,Long> response = new LinkedHashMap<>();
         response.put("resultSize",resultSize);
         return gson.toJson(response,LinkedHashMap.class);
     }
 
-    private boolean sendMessage(String JSON){
+    private void sendMessage(String JSON){
         try {
             output.writeUTF(JSON);
             output.flush();
-            return true;
         }catch (IOException e){
             ServerInstance.logger.warning(this.ClientAddress+": IOException when sending message!");
-            return false;}
+        }
     }
 
     public List<ResourceTemplate> queryRelay(Host host,QueryMessage queryMessage){
@@ -347,7 +340,6 @@ public class WorkerThread extends Thread {
         try(Socket socket = new Socket(host.getHostname(),host.getPort())) {
 
             ServerInstance.logger.fine("querying to "+socket.getRemoteSocketAddress().toString());
-
             socket.setSoTimeout(3000);
 
             DataInputStream inputStream = new DataInputStream(socket.getInputStream());
@@ -370,6 +362,7 @@ public class WorkerThread extends Thread {
                     result.add(r);
                     response = inputStream.readUTF();
                 }
+                ServerInstance.logger.fine("successfully queried "+socket.getRemoteSocketAddress().toString());
             }else {
                 ServerInstance.logger.warning(response);
             }
@@ -381,9 +374,8 @@ public class WorkerThread extends Thread {
         }catch (ConnectException e){
             ServerInstance.logger.warning(host.toString()+" timeout when create relay socket");
             this.serverList.removeServer(host);
-        }
-        catch (IOException e){
-            ServerInstance.logger.warning(host.toString()+" IOEXCEPTION when query relay");
+        } catch (IOException e){
+            ServerInstance.logger.warning(host.toString()+" IOException when query relay");
             this.serverList.removeServer(host);
         }
        return result;

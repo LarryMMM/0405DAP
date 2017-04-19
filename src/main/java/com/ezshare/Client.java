@@ -14,6 +14,7 @@ import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 
 
@@ -27,7 +28,6 @@ public class Client {
     private static final Logger logger = LogCustomFormatter.getLogger(Client.class.getName());
     private static final Gson gson = new Gson();
     private static final int TIME_OUT = 3000;
-    private static boolean debug = false;
 
     /**
      * Construct command line options
@@ -121,7 +121,7 @@ public class Client {
         output.flush();
 
         //log
-        if(debug) logger.fine("SENT:"+JSON);
+         logger.fine("SENT:"+JSON);
     }
 
 
@@ -131,7 +131,7 @@ public class Client {
      * @param socket    The socket connected to target server.
      * @param resourceTemplate  The encapsulation of the resource.
      */
-    public static List<ResourceTemplate> queryCommand(Socket socket,ResourceTemplate resourceTemplate) throws IOException{
+    public static void queryCommand(Socket socket,ResourceTemplate resourceTemplate) throws IOException{
 
         socket.setSoTimeout(TIME_OUT);
         List<ResourceTemplate> result = new ArrayList<>();
@@ -139,7 +139,7 @@ public class Client {
             DataInputStream input = new DataInputStream(socket.getInputStream());
             DataOutputStream output = new DataOutputStream(socket.getOutputStream());
 
-            if(debug) logger.fine("querying to "+socket.getRemoteSocketAddress());
+             logger.fine("querying to "+socket.getRemoteSocketAddress());
 
             QueryMessage queryMessage = new QueryMessage(resourceTemplate,true);
 
@@ -151,7 +151,7 @@ public class Client {
             //receive response
             if(response.contains("success")){
                 //if success print resources
-                if(debug)   logger.fine("RECEIVE:"+response);
+                   logger.fine("RECEIVE:"+response);
                 response = input.readUTF(); //discard success message
                 while (!response.contains("resultSize")){
                     //print out resources
@@ -161,13 +161,11 @@ public class Client {
                     response = input.readUTF();
                 }
                 //receive result size for successful request
-                if(debug)   logger.fine("RECEIVE_ALL:"+response);
+                   logger.fine("RECEIVE_ALL:"+response);
             }else if(response.contains("error")){
                 //when error occur
-                if(debug) logger.warning("RECEIVED:"+response);
+                 logger.warning("RECEIVED:"+response);
             }
-
-        return result;
     }
 
     /**
@@ -181,7 +179,7 @@ public class Client {
             DataInputStream input = new DataInputStream(socket.getInputStream());
             DataOutputStream output = new DataOutputStream(socket.getOutputStream());
 
-            if(debug) logger.fine("publishing to "+socket.getRemoteSocketAddress());
+             logger.fine("publishing to "+socket.getRemoteSocketAddress());
 
             PublishMessage publishMessage = new PublishMessage(resourceTemplate);
 
@@ -190,9 +188,9 @@ public class Client {
 
             String response = input.readUTF();
 
-            if(response.contains("error")&&debug)
+            if(response.contains("error"))
                 logger.warning("RECEIVED:"+response);
-            if(response.contains("success")&&debug)
+            if(response.contains("success"))
                 logger.fine("RECEIVED:"+response);
 
 
@@ -210,7 +208,7 @@ public class Client {
             DataInputStream input = new DataInputStream(socket.getInputStream());
             DataOutputStream output = new DataOutputStream(socket.getOutputStream());
 
-            if(debug) logger.fine("sharing to "+socket.getRemoteSocketAddress());
+             logger.fine("sharing to "+socket.getRemoteSocketAddress());
 
             ShareMessage shareMessage = new ShareMessage(resourceTemplate,secret);
 
@@ -218,9 +216,9 @@ public class Client {
             sendMessage(output,JSON);
 
             String response = input.readUTF();
-            if(response.contains("error")&&debug)
+            if(response.contains("error"))
                 logger.warning("RECEIVED:"+response);
-            if(response.contains("success")&&debug)
+            if(response.contains("success"))
                 logger.fine("RECEIVED:"+response);
 
 
@@ -237,7 +235,7 @@ public class Client {
             DataInputStream input = new DataInputStream(socket.getInputStream());
             DataOutputStream output = new DataOutputStream(socket.getOutputStream());
 
-            if(debug) logger.fine("removing to "+socket.getRemoteSocketAddress());
+             logger.fine("removing to "+socket.getRemoteSocketAddress());
 
             RemoveMessage removeMessage = new RemoveMessage(resourceTemplate);
 
@@ -245,9 +243,9 @@ public class Client {
             sendMessage(output,JSON);
 
             String response = input.readUTF();
-            if(response.contains("error")&&debug)
+            if(response.contains("error"))
                 logger.warning("RECEIVED:"+response);
-            if(response.contains("success")&&debug)
+            if(response.contains("success"))
                 logger.fine("RECEIVED:"+response);
 
 
@@ -265,7 +263,7 @@ public class Client {
             DataInputStream input = new DataInputStream(socket.getInputStream());
             DataOutputStream output = new DataOutputStream(socket.getOutputStream());
 
-            if(debug) logger.fine("exchanging to "+socket.getRemoteSocketAddress());
+             logger.fine("exchanging to "+socket.getRemoteSocketAddress());
 
             ExchangeMessage exchangeMessage = new ExchangeMessage(serverList);
 
@@ -273,9 +271,9 @@ public class Client {
             sendMessage(output,JSON);
 
             String response = input.readUTF();
-            if(response.contains("error")&&debug)
+            if(response.contains("error"))
                 logger.warning("RECEIVED:"+response);
-            if(response.contains("success")&&debug)
+            if(response.contains("success"))
                 logger.fine("RECEIVED:"+response);
 
     }
@@ -291,7 +289,7 @@ public class Client {
             DataInputStream input = new DataInputStream(socket.getInputStream());
             DataOutputStream output = new DataOutputStream(socket.getOutputStream());
 
-            if(debug) logger.fine("fetching to "+socket.getRemoteSocketAddress());
+             logger.fine("fetching to "+socket.getRemoteSocketAddress());
 
             FetchMessage fetchMessage = new FetchMessage(resourceTemplate);
 
@@ -301,18 +299,18 @@ public class Client {
             String response = input.readUTF();
             if(response.contains("success")){
 
-                if(debug)logger.fine("RECEIVED:"+response);
+                logger.fine("RECEIVED:"+response);
                 //try to read file template
                 String file_template = input.readUTF();
 
 
                 //if result size is 0
                 if (file_template.contains("resultSize")){
-                    if(debug)logger.warning("RECEIVED_ALL:"+file_template);
+                    logger.warning("RECEIVED_ALL:"+file_template);
                 }
                 else {
                 //result exist! parse resource template
-                if(debug) logger.fine("RECEIVE:"+file_template);
+                 logger.fine("RECEIVE:"+file_template);
                 FileTemplate receivedFileTemplate = gson.fromJson(file_template,FileTemplate.class);
 
                 int resource_size = (int)receivedFileTemplate.getResourceSize();
@@ -346,7 +344,7 @@ public class Client {
                 }
 
             }else if(response.contains("error")){
-                if(debug)   logger.warning("RECEIVED:"+response);
+                   logger.warning("RECEIVED:"+response);
             }
 
     }
@@ -368,8 +366,11 @@ public class Client {
             if(!optionsValidator(line)){throw new ParseException("Multiple command options!");}
 
             //set debug on if toggled
-            debug = line.hasOption("debug");
-            if (debug) logger.info("setting debug on");
+            if(!line.hasOption("debug")) {
+                logger.setFilter((LogRecord record)->(false));}
+            else {
+                logger.info("setting debug on");
+            }
 
             //get destination host from commandline args
             Host host = getHost(line);
@@ -425,7 +426,7 @@ public class Client {
                 }else fetchCommand(socket,resourceTemplate);
             }
 
-            if(error_message!=null&&debug){
+            if(error_message!=null){
                 logger.warning(error_message);
             }
 
@@ -435,20 +436,20 @@ public class Client {
             HelpFormatter helpFormatter = new HelpFormatter();
             helpFormatter.printHelp("EZShare.Client",options);
         }catch (ConnectException e){
-            if(debug) logger.warning("Socket connection timeout!");
+             logger.warning("Socket connection timeout!");
         }catch (ArrayIndexOutOfBoundsException | NumberFormatException e){
             //when value of -servers option invalid
-            if (debug) logger.warning("Server address invalid.");
+            logger.warning("Server address invalid.");
         }catch (SocketTimeoutException e){
-            if (debug) logger.warning("Socket timeout!");
+            logger.warning("Socket timeout!");
 
         }catch (IOException e){
-            if (debug) logger.warning("IOException!");}
+            logger.warning("IOException!");}
         finally {
             try {
                 socket.close();
             }catch (IOException e){
-                if (debug) logger.warning("IOException! Disconnect!");}
+                logger.warning("IOException! Disconnect!");}
         }
     }
 

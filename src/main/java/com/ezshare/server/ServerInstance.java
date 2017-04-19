@@ -1,7 +1,6 @@
 package com.ezshare.server;
 
 import com.ezshare.log.LogCustomFormatter;
-import com.ezshare.message.Host;
 import org.apache.commons.cli.*;
 
 import java.io.IOException;
@@ -13,8 +12,6 @@ import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.logging.Filter;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import javax.net.ServerSocketFactory;
@@ -48,7 +45,7 @@ public class ServerInstance {
     /*
         A HashMap to record the mapping from a specified client to the starting time of its last connection
     */
-    private static ConcurrentHashMap<String, Long> intervalLimit = new ConcurrentHashMap<String, Long>();
+    private static ConcurrentHashMap<String, Long> intervalLimit = new ConcurrentHashMap<>();
 
     /**
      * Construct command line options
@@ -72,7 +69,7 @@ public class ServerInstance {
     public static String random(int length) {
         String str = "abcdefghijklmnopqrstuvwxyz0123456789";
         Random random = new Random();
-        StringBuffer buf = new StringBuffer();
+        StringBuilder buf = new StringBuilder();
         for (int i = 0; i < length; i++) {
             int num = random.nextInt(36);
             buf.append(str.charAt(num));
@@ -81,6 +78,7 @@ public class ServerInstance {
     }
 
     public static void main(String[] args) {
+        logger.info("Starting the EZShare Server");
         /* Timer running as a daemon thread schedules the regular EXCHANGE command. */
         Timer timer = new Timer(true);
         TimerTask regularExchangeTask = new TimerTask() {   
@@ -122,18 +120,22 @@ public class ServerInstance {
                 SECRET = line.getOptionValue("secret");
 
             }
-
-            DEBUG = line.hasOption("debug");
-            if(!DEBUG){logger.setFilter((LogRecord record)->(false));}
+            //if debug not toggle, cancel all logs.
+            if(!line.hasOption("debug")) {
+                logger.setFilter((LogRecord record)->(false));}
+            else {
+                logger.info("setting debug on");
+            }
 
             logger.info("using advertised hostname: "+HOST);
             logger.info(String.valueOf("using connection interval limit: "+INTERVAL));
             logger.info(String.valueOf("using exchange interval period: "+EXCHANGE_PERIOD));
             logger.info("using secret: "+SECRET);
-            logger.info("bound to "+PORT);
+            logger.info("bound to port "+PORT);
 
             System.out.println("ServerSocket initialized.");
             System.out.println("Waiting for client connection..");
+            logger.info("started");
 
             /* Wait for connections. */
             while (true) {
