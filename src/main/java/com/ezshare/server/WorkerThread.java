@@ -50,28 +50,32 @@ public class WorkerThread extends Thread {
 
             Message message = gson.fromJson(JSON,Message.class);
 
-            switch (message.getCommand()){
-                case "PUBLISH":
-                    processPublish(JSON);
-                    break;
-                case "SHARE":
-                    processShare(JSON);
-                    break;
-                case "REMOVE":
-                    processRemove(JSON);
-                    break;
-                case "EXCHANGE":
-                    processExchange(JSON);
-                    break;
-                case "FETCH":
-                    processFetch(JSON);
-                    break;
-                case "QUERY":
-                    processQuery(JSON);
-                    break;
-                default:
-                    ServerInstance.logger.warning(this.ClientAddress+": invalid command");
-                    sendMessage(getErrorMessage("invalid command"));
+            if(message.getCommand()==null){
+                throw new JsonSyntaxException("missing command");
+            }else {
+                switch (message.getCommand()) {
+                    case "PUBLISH":
+                        processPublish(JSON);
+                        break;
+                    case "SHARE":
+                        processShare(JSON);
+                        break;
+                    case "REMOVE":
+                        processRemove(JSON);
+                        break;
+                    case "EXCHANGE":
+                        processExchange(JSON);
+                        break;
+                    case "FETCH":
+                        processFetch(JSON);
+                        break;
+                    case "QUERY":
+                        processQuery(JSON);
+                        break;
+                    default:
+                        ServerInstance.logger.warning(this.ClientAddress + ": invalid command");
+                        sendMessage(getErrorMessage("invalid command"));
+                }
             }
 
         }catch (JsonSyntaxException e){
@@ -101,20 +105,23 @@ public class WorkerThread extends Thread {
     private void processPublish(String JSON){
         try {
             PublishMessage publishMessage = gson.fromJson(JSON,PublishMessage.class);
-            ResourceTemplate r = publishMessage.getResource();
-            r.setEzserver(ServerInstance.HOST);
 
-            if(!publishMessage.isValid()){
-                ServerInstance.logger.warning(this.ClientAddress+": invalid resource");
-                sendMessage(getErrorMessage("invalid resource"));
-
-            }else if(!fileList.add(r)){
-                ServerInstance.logger.warning(this.ClientAddress+": cannot publish resource");
-                sendMessage(getErrorMessage("cannot publish resource"));
-
+            if(publishMessage.getResource()==null){
+                throw new JsonSyntaxException("missing resource");
             }else {
-                ServerInstance.logger.fine(this.ClientAddress+": resource published!");
-                sendMessage(getSuccessMessage());
+                ResourceTemplate r = publishMessage.getResource();
+                r.setEzserver(ServerInstance.HOST);
+                if (!publishMessage.isValid()) {
+                    ServerInstance.logger.warning(this.ClientAddress + ": invalid resource");
+                    sendMessage(getErrorMessage("invalid resource"));
+                } else if (!fileList.add(r)) {
+                    ServerInstance.logger.warning(this.ClientAddress + ": cannot publish resource");
+                    sendMessage(getErrorMessage("cannot publish resource"));
+
+                } else {
+                    ServerInstance.logger.fine(this.ClientAddress + ": resource published!");
+                    sendMessage(getSuccessMessage());
+                }
             }
 
         }catch (JsonSyntaxException e){
@@ -130,19 +137,22 @@ public class WorkerThread extends Thread {
     private void processRemove(String JSON){
         try {
             RemoveMessage removeMessage = gson.fromJson(JSON,RemoveMessage.class);
-            ResourceTemplate r = removeMessage.getResource();
-
-            if(!removeMessage.isValid()){
-                ServerInstance.logger.warning(this.ClientAddress+": invalid resource");
-                sendMessage(getErrorMessage("invalid resource"));
-
-            }else if(!fileList.remove(r)){
-                ServerInstance.logger.warning(this.ClientAddress+": cannot remove resource");
-                sendMessage(getErrorMessage("cannot publish resource"));
-
+            if(removeMessage.getResource()==null) {
+                throw new JsonSyntaxException("missing resource");
             }else {
-                ServerInstance.logger.fine(this.ClientAddress+": resource removed!");
-                sendMessage(getSuccessMessage());
+                ResourceTemplate r = removeMessage.getResource();
+                if (!removeMessage.isValid()) {
+                    ServerInstance.logger.warning(this.ClientAddress + ": invalid resource");
+                    sendMessage(getErrorMessage("invalid resource"));
+
+                } else if (!fileList.remove(r)) {
+                    ServerInstance.logger.warning(this.ClientAddress + ": cannot remove resource");
+                    sendMessage(getErrorMessage("cannot publish resource"));
+
+                } else {
+                    ServerInstance.logger.fine(this.ClientAddress + ": resource removed!");
+                    sendMessage(getSuccessMessage());
+                }
             }
 
         }catch (JsonSyntaxException e){
@@ -158,38 +168,42 @@ public class WorkerThread extends Thread {
     private void processShare(String JSON){
         try {
             ShareMessage shareMessage = gson.fromJson(JSON,ShareMessage.class);
-            ResourceTemplate r = shareMessage.getResource();
-            r.setEzserver(ServerInstance.HOST);
 
-            if (!shareMessage.isValid()){
-                //resource not valid
-                ServerInstance.logger.warning(this.ClientAddress+": invalid resource");
-                sendMessage(getErrorMessage("invalid resource"));
-            }else if(!shareMessage.getSecret().equals(ServerInstance.SECRET)){
-                //secret incorrect
-                ServerInstance.logger.warning(this.ClientAddress+": incorrect secret");
-                sendMessage(getErrorMessage("incorrect secret"));
-            }else{
-                String message;
-                File f = new File(new URI(r.getUri()).getPath());
-                ServerInstance.logger.info(this.ClientAddress+": request for sharing "+r.getUri());
-                if(f.exists()){
-                    //file exist
-                    if(fileList.add(r)){
-                        //file successfully added
-                        ServerInstance.logger.fine(this.ClientAddress+": resource shared!");
-                        message = getSuccessMessage();
-                    }else{
-                        //file exist but cannot be added
-                        ServerInstance.logger.warning(this.ClientAddress+": resource unable to be added!");
+            if(shareMessage.getResource()==null||shareMessage.getSecret()==null){
+                throw new JsonSyntaxException("missing secret and/or resource");
+            }else {
+                ResourceTemplate r = shareMessage.getResource();
+                r.setEzserver(ServerInstance.HOST);
+                if (!shareMessage.isValid()) {
+                    //resource not valid
+                    ServerInstance.logger.warning(this.ClientAddress + ": invalid resource");
+                    sendMessage(getErrorMessage("invalid resource"));
+                } else if (!shareMessage.getSecret().equals(ServerInstance.SECRET)) {
+                    //secret incorrect
+                    ServerInstance.logger.warning(this.ClientAddress + ": incorrect secret");
+                    sendMessage(getErrorMessage("incorrect secret"));
+                } else {
+                    String message;
+                    File f = new File(new URI(r.getUri()).getPath());
+                    ServerInstance.logger.info(this.ClientAddress + ": request for sharing " + r.getUri());
+                    if (f.exists()) {
+                        //file exist
+                        if (fileList.add(r)) {
+                            //file successfully added
+                            ServerInstance.logger.fine(this.ClientAddress + ": resource shared!");
+                            message = getSuccessMessage();
+                        } else {
+                            //file exist but cannot be added
+                            ServerInstance.logger.warning(this.ClientAddress + ": resource unable to be added!");
+                            message = getErrorMessage("cannot share resource");
+                        }
+                    } else {
+                        //file don't exist
+                        ServerInstance.logger.warning(this.ClientAddress + ": resource does not exist");
                         message = getErrorMessage("cannot share resource");
                     }
-                }else {
-                    //file don't exist
-                    ServerInstance.logger.warning(this.ClientAddress+": resource does not exist");
-                    message = getErrorMessage("cannot share resource");
+                    sendMessage(message);
                 }
-                sendMessage(message);
             }
 
 
@@ -210,21 +224,25 @@ public class WorkerThread extends Thread {
     private void processExchange(String JSON){
         try {
             ExchangeMessage exchangeMessage = gson.fromJson(JSON,ExchangeMessage.class);
-            List<Host> serverList = exchangeMessage.getServerList();
 
-            if (exchangeMessage.isValid()){
-                //all servers valid, add to server list.
-                this.serverList.updateServerList(serverList);
-                ServerInstance.logger.fine(this.ClientAddress+": servers added");
-                sendMessage(getSuccessMessage());
+            if(exchangeMessage.getServerList()==null||exchangeMessage.getServerList().isEmpty()){
+                throw new JsonSyntaxException("missing server");
             }else {
 
-                sendMessage(getErrorMessage("invalid server record"));
-            }
+                List<Host> serverList = exchangeMessage.getServerList();
 
+                if (exchangeMessage.isValid()) {
+                    //all servers valid, add to server list.
+                    this.serverList.updateServerList(serverList);
+                    ServerInstance.logger.fine(this.ClientAddress + ": servers added");
+                    sendMessage(getSuccessMessage());
+                } else {
+                    sendMessage(getErrorMessage("invalid server record"));
+                }
+            }
         }catch (JsonSyntaxException e){
-            ServerInstance.logger.warning(this.ClientAddress+": missing resource");
-            sendMessage(getErrorMessage("missing resource"));
+            ServerInstance.logger.warning(this.ClientAddress+": missing or invalid server list");
+            sendMessage(getErrorMessage("missing or invalid server list"));
         }
 
     }
@@ -236,49 +254,53 @@ public class WorkerThread extends Thread {
     public void processQuery(String JSON){
         try {
             QueryMessage queryMessage = gson.fromJson(JSON,QueryMessage.class);
-            ResourceTemplate r = queryMessage.getResourceTemplate();
+            if(queryMessage.getResourceTemplate()==null){
+                throw new JsonSyntaxException("missing resource");
+            }else {
+                ResourceTemplate r = queryMessage.getResourceTemplate();
 
-            ServerInstance.logger.info(client.getRemoteSocketAddress()+" querying for "+r.toString());
+                ServerInstance.logger.info(client.getRemoteSocketAddress() + " querying for " + r.toString());
 
-            if(!queryMessage.isValid()){
-                ServerInstance.logger.warning(this.ClientAddress+": invalid resourceTemplate");
-                sendMessage(getErrorMessage("invalid resourceTemplate"));
-            }else if(!queryMessage.isRelay()){
-                //relay is false,only query local resource
-                List<ResourceTemplate> result = this.fileList.query(r);
+                if (!queryMessage.isValid()) {
+                    ServerInstance.logger.warning(this.ClientAddress + ": invalid resourceTemplate");
+                    sendMessage(getErrorMessage("invalid resourceTemplate"));
+                } else if (!queryMessage.isRelay()) {
+                    //relay is false,only query local resource
+                    List<ResourceTemplate> result = this.fileList.query(r);
 
-                sendMessage(getSuccessMessage());
+                    sendMessage(getSuccessMessage());
 
-                ServerInstance.logger.fine("Query Success");
+                    ServerInstance.logger.fine("Query Success");
 
-                if(!result.isEmpty()) {
+                    if (!result.isEmpty()) {
+                        for (ResourceTemplate rt : result) {
+                            sendMessage(rt.toString());
+                        }
+                    }
+                    sendMessage(getResultSize(((long) result.size())));
+                } else {
+                    //relay is true, query local resource first
+                    List<ResourceTemplate> result = this.fileList.query(r);
+
+                    QueryMessage relayMessage = gson.fromJson(JSON, QueryMessage.class);
+
+                    relayMessage.setRelay(false);
+                    relayMessage.getResourceTemplate().setOwner("");
+                    relayMessage.getResourceTemplate().setChannel("");
+
+                    //append result set by querying remote servers
+                    for (Host h : this.serverList.getServerList()) {
+                        List<ResourceTemplate> rtl = queryRelay(h, relayMessage);
+                        result.addAll(rtl);
+                    }
+
+                    sendMessage(getSuccessMessage());
                     for (ResourceTemplate rt : result) {
                         sendMessage(rt.toString());
                     }
+                    sendMessage(getResultSize(((long) result.size())));
+                    ServerInstance.logger.fine("Query relay Success");
                 }
-                sendMessage(getResultSize(((long) result.size())));
-            }else {
-                //relay is true, query local resource first
-                List<ResourceTemplate> result = this.fileList.query(r);
-
-                QueryMessage relayMessage = gson.fromJson(JSON,QueryMessage.class);
-
-                relayMessage.setRelay(false);
-                relayMessage.getResourceTemplate().setOwner("");
-                relayMessage.getResourceTemplate().setChannel("");
-
-                //append result set by querying remote servers
-                for (Host h:this.serverList.getServerList()) {
-                    List<ResourceTemplate> rtl = queryRelay(h,relayMessage);
-                    result.addAll(rtl);
-                }
-
-                sendMessage(getSuccessMessage());
-                for (ResourceTemplate rt: result) {
-                    sendMessage(rt.toString());
-                }
-                sendMessage(getResultSize(((long) result.size())));
-                ServerInstance.logger.fine("Query relay Success");
             }
 
         }catch (JsonSyntaxException e){
@@ -295,34 +317,38 @@ public class WorkerThread extends Thread {
     private void processFetch(String JSON){
         try{
             FetchMessage fetchMessage = gson.fromJson(JSON,FetchMessage.class);
-            ResourceTemplate r = fetchMessage.getResource();
+            if(fetchMessage.getResource()==null){
+                throw new JsonSyntaxException("missing resource");
+            }else {
+                ResourceTemplate r = fetchMessage.getResource();
 
-            if(!fetchMessage.isValid()){
-                ServerInstance.logger.warning(this.ClientAddress+": invalid resourceTemplate");
-                sendMessage(getErrorMessage("invalid resourceTemplate"));
-            }else{
-                List<ResourceTemplate> result = this.fileList.query(r);
+                if (!fetchMessage.isValid()) {
+                    ServerInstance.logger.warning(this.ClientAddress + ": invalid resourceTemplate");
+                    sendMessage(getErrorMessage("invalid resourceTemplate"));
+                } else {
+                    List<ResourceTemplate> result = this.fileList.query(r);
 
-                if(!result.isEmpty()){
-                    RandomAccessFile file = new RandomAccessFile(new File(new URI(r.getUri()).getPath()),"r");
-                    //file is exist.
-                    sendMessage(getSuccessMessage());
-                    sendMessage(gson.toJson(new FileTemplate(result.get(0),file.length())));
+                    if (!result.isEmpty()) {
+                        RandomAccessFile file = new RandomAccessFile(new File(new URI(r.getUri()).getPath()), "r");
+                        //file is exist.
+                        sendMessage(getSuccessMessage());
+                        sendMessage(gson.toJson(new FileTemplate(result.get(0), file.length())));
 
-                    byte[] sendingBuffer = new byte[1024*1024];
-                    int num;
-                    // While there are still bytes to send..
-                    ServerInstance.logger.info(this.ClientAddress+": start sending file "+r.getUri());
-                    while((num = file.read(sendingBuffer)) > 0){
-                        output.write(Arrays.copyOf(sendingBuffer, num));
+                        byte[] sendingBuffer = new byte[1024 * 1024];
+                        int num;
+                        // While there are still bytes to send..
+                        ServerInstance.logger.info(this.ClientAddress + ": start sending file " + r.getUri());
+                        while ((num = file.read(sendingBuffer)) > 0) {
+                            output.write(Arrays.copyOf(sendingBuffer, num));
+                        }
+                        file.close();
+                        sendMessage(getResultSize((long) 1));
+                        ServerInstance.logger.fine(this.ClientAddress + ": successfully sent " + r.getUri());
+                    } else {
+                        sendMessage(getSuccessMessage());
+                        sendMessage(getResultSize((long) 0));
+                        ServerInstance.logger.fine(this.ClientAddress + ": no matched file");
                     }
-                    file.close();
-                    sendMessage(getResultSize((long)1));
-                    ServerInstance.logger.fine(this.ClientAddress+": successfully sent "+r.getUri());
-                }else {
-                    sendMessage(getSuccessMessage());
-                    sendMessage(getResultSize((long)0));
-                    ServerInstance.logger.fine(this.ClientAddress+": no matched file");
                 }
             }
         }catch (JsonSyntaxException e){
