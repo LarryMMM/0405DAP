@@ -24,7 +24,13 @@ public class WorkerThread extends Thread {
     private String ClientAddress;
     private Gson gson = new Gson();
 
-
+    /**
+     * Initialize worker thread, create IO streams.
+     * @param client    the socket.
+     * @param fileList  reference of file list.
+     * @param serverList    reference of server list.
+     * @throws IOException  when unable to create IO streams.
+     */
     public WorkerThread(Socket client, FileList fileList, ServerList serverList) throws IOException {
         this.client = client;
         this.client.setSoTimeout(3000);
@@ -69,14 +75,18 @@ public class WorkerThread extends Thread {
             }
 
         }catch (JsonSyntaxException e){
+            //cannot parse Json to Message object.
             ServerInstance.logger.warning(this.ClientAddress+": missing or incorrect type for command");
             sendMessage(getErrorMessage("missing or incorrect type for command"));
         }catch (SocketTimeoutException e){
+            //Socket time out during communication.
             ServerInstance.logger.warning(this.ClientAddress+": Socket Timeout");
         }catch (IOException e){
+            //Socket time out in establishing.
             ServerInstance.logger.warning(this.ClientAddress+": IOException!");}
         finally {
             try {
+                //try to close socket any way.
                 client.close();
                 ServerInstance.logger.info(this.ClientAddress+": Disconnected!");
             }catch (IOException e){
@@ -84,6 +94,10 @@ public class WorkerThread extends Thread {
             }
         }
 
+    /**
+     * Process publish request.
+     * @param JSON  request
+     */
     private void processPublish(String JSON){
         try {
             PublishMessage publishMessage = gson.fromJson(JSON,PublishMessage.class);
@@ -109,6 +123,10 @@ public class WorkerThread extends Thread {
         }
     }
 
+    /**
+     * Process remove request.
+     * @param JSON  request
+     */
     private void processRemove(String JSON){
         try {
             RemoveMessage removeMessage = gson.fromJson(JSON,RemoveMessage.class);
@@ -133,6 +151,10 @@ public class WorkerThread extends Thread {
         }
     }
 
+    /**
+     * Process share request.
+     * @param JSON  request
+     */
     private void processShare(String JSON){
         try {
             ShareMessage shareMessage = gson.fromJson(JSON,ShareMessage.class);
@@ -181,6 +203,10 @@ public class WorkerThread extends Thread {
 
     }
 
+    /**
+     * Process exchange request.
+     * @param JSON  request
+     */
     private void processExchange(String JSON){
         try {
             ExchangeMessage exchangeMessage = gson.fromJson(JSON,ExchangeMessage.class);
@@ -203,6 +229,10 @@ public class WorkerThread extends Thread {
 
     }
 
+    /**
+     * Process plain query and query relay requests.
+     * @param JSON  request
+     */
     public void processQuery(String JSON){
         try {
             QueryMessage queryMessage = gson.fromJson(JSON,QueryMessage.class);
@@ -258,6 +288,10 @@ public class WorkerThread extends Thread {
 
     }
 
+    /**
+     * Process fetch request.
+     * @param JSON  request
+     */
     private void processFetch(String JSON){
         try{
             FetchMessage fetchMessage = gson.fromJson(JSON,FetchMessage.class);
@@ -305,6 +339,11 @@ public class WorkerThread extends Thread {
         }
     }
 
+    /**
+     * Create JSON string of error message.
+     * @param errorMessage  The message in errorMessage field.
+     * @return  JSON string
+     */
     private String getErrorMessage(String errorMessage){
         Map<String,String> response = new LinkedHashMap<>();
         response.put("response","error");
@@ -312,18 +351,31 @@ public class WorkerThread extends Thread {
         return gson.toJson(response,LinkedHashMap.class);
     }
 
+    /**
+     * Create JSON string of success message.
+     * @return  JSON string
+     */
     private String getSuccessMessage(){
         Map<String,String> response = new LinkedHashMap<>();
         response.put("response","success");
         return gson.toJson(response,LinkedHashMap.class);
     }
 
+    /**
+     * Create JSON string of resultSize message
+     * @param resultSize    value in resultSize field.
+     * @return  JSON string.
+     */
     private String getResultSize(Long resultSize){
         Map<String,Long> response = new LinkedHashMap<>();
         response.put("resultSize",resultSize);
         return gson.toJson(response,LinkedHashMap.class);
     }
 
+    /**
+     * Send JSON message via output stream and IOException handling.
+     * @param JSON  JSON message to be sent.
+     */
     private void sendMessage(String JSON){
         try {
             output.writeUTF(JSON);
@@ -333,6 +385,12 @@ public class WorkerThread extends Thread {
         }
     }
 
+    /**
+     * Process query relay request to other remote server in server list, almost identical to that of in Client.
+     * @param host  Host to query.
+     * @param queryMessage  The queryMessage.
+     * @return  Result set of the query.
+     */
     public List<ResourceTemplate> queryRelay(Host host,QueryMessage queryMessage){
 
         List<ResourceTemplate> result = new ArrayList<>();
@@ -353,14 +411,15 @@ public class WorkerThread extends Thread {
             String response = inputStream.readUTF();
 
             if(response.contains("success")){
-                response = inputStream.readUTF(); //discard success message
-                while (!response.contains("resultSize")){
+                response = inputStream.readUTF(); //discard success message.
+                while (!response.contains("resultSize")){   //only read resource part.
                     ResourceTemplate r = gson.fromJson(response,ResourceTemplate.class);
+                    //encrypt owner field if necessary.
                     if(!r.getOwner().equals("")){
                         r.setOwner("*");
                     }
                     result.add(r);
-                    response = inputStream.readUTF();
+                    response = inputStream.readUTF();   //read next response.
                 }
                 ServerInstance.logger.fine("successfully queried "+socket.getRemoteSocketAddress().toString());
             }else {
