@@ -1,5 +1,6 @@
 package com.ezshare.server;
 
+import com.ezshare.Server;
 import com.ezshare.message.ExchangeMessage;
 import com.ezshare.message.Host;
 import com.google.gson.Gson;
@@ -23,7 +24,7 @@ import java.util.concurrent.ThreadLocalRandom;
  * @author Wenhao Zhao
  */
 public class ServerList {
-    public static final int SERVER_TIMEOUT = (int) ServerInstance.EXCHANGE_PERIOD / 2;
+    public static final int SERVER_TIMEOUT = (int) Server.EXCHANGE_PERIOD / 2;
     
     /* TO-DO: What if serverList contains itself? */
     private final List<Host> serverList = new ArrayList<>();
@@ -68,7 +69,7 @@ public class ServerList {
                 DataInputStream input = new DataInputStream(socket.getInputStream());
                 DataOutputStream output = new DataOutputStream(socket.getOutputStream());
 
-                ServerInstance.logger.fine("Regular EXCHANGE to " + socket.getRemoteSocketAddress());
+                Server.logger.fine("Regular EXCHANGE to " + socket.getRemoteSocketAddress());
                 
                 ExchangeMessage exchangeMessage = new ExchangeMessage(serverList);
                 
@@ -79,18 +80,18 @@ public class ServerList {
                 String response = input.readUTF();
                 
                 if (response.contains("error"))
-                    ServerInstance.logger.warning("RECEIVED : " + response);
+                    Server.logger.warning("RECEIVED : " + response);
                 if (response.contains("success"))
-                    ServerInstance.logger.fine("RECEIVED : " + response);
+                    Server.logger.fine("RECEIVED : " + response);
             } catch (ConnectException ex) {
-                ServerInstance.logger.warning(randomHost.toString() + " connection timeout");
+                Server.logger.warning(randomHost.toString() + " connection timeout");
                 removeServer(randomHost);
             } catch (SocketTimeoutException ex) {
-                ServerInstance.logger.warning(randomHost.toString() + " readUTF() timeout");
+                Server.logger.warning(randomHost.toString() + " readUTF() timeout");
                 removeServer(randomHost);
             } catch (IOException ex) {
                 /* Unclassified exception */
-                ServerInstance.logger.warning(randomHost.toString() + " IOException");
+                Server.logger.warning(randomHost.toString() + " IOException");
                 removeServer(randomHost);
             }
         }

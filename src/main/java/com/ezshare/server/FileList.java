@@ -87,17 +87,17 @@ public class FileList {
      * search a certain list of file by owner, uri and channel in filelist
      *
      *
-     * @param resourceTemplate  Resource in query.
+     * @param query  Resource in query.
      * @return querylist    List of resources that match the query.
      *
      * */
-    public List<ResourceTemplate> query(ResourceTemplate resourceTemplate) {
+    public List<ResourceTemplate> query(ResourceTemplate query) {
         lock.readLock().lock();
         List<ResourceTemplate> queryList = new ArrayList<>();
         try{
-            for(ResourceTemplate f : resourceTemplateList) {
-                if (f.match(resourceTemplate)) {
-                    queryList.add(f);
+            for(ResourceTemplate candidate : resourceTemplateList) {
+                if (query.match(candidate)) {
+                    queryList.add(candidate);
                 }
             }
             return queryList;
