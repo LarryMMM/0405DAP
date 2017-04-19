@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Arrays;
 
 /**
  * Encapsulation of Query Message.
@@ -124,16 +125,39 @@ public class ResourceTemplate extends Validatable {
 
     public boolean match(ResourceTemplate list){
 
-        return string_match(this.getName(),list.getName())
-                &&string_match(this.getOwner(),list.getOwner())
-                &&string_match(this.getChannel(),list.getChannel())
-                &&string_match(this.getUri(),list.getUri())
-                &&string_match(this.getDescription(),list.getDescription());
+        return channel_match(this.channel,list.getChannel())
+                &&owner_match(this.owner,list.getOwner())
+                &&tag_match(this.tags,list.getTag())
+                &&string_match(this.uri,list.getUri())
+                &&(list.getName().contains(this.name)
+                    || list.getDescription().contains(this.description)
+                    || (this.description.equals("")
+                        &&this.name.equals("")));
     }
 
     private static boolean string_match(String s1,String s2){
         return (s1==null||s2==null||s1.equals("")||s2.equals("")||s1.equals(s2));
     }
+
+    private static boolean channel_match(String channel1,String channel2){
+        return channel1.equals(channel2);
+    }
+
+    private static boolean owner_match(String owner1,String owner2){
+        return (owner1.equals("")||owner1.equals(owner2));
+    }
+    
+    private static boolean tag_match(String[] tags1,String[] tags2){
+        boolean match = true;
+        for (String t:tags1) {
+            if(!Arrays.asList(tags2).contains(t)){
+                match = false;
+            }
+        }
+        return match;
+    }
+
+
 
 
 }
