@@ -1,7 +1,7 @@
 {
     "command": "QUERY",
-    "relay": false
-    "resource": {
+    "relay": false,
+    "resourceTemplate": {
         "name": "Unimelb website",
         "tags": [
             "web",

@@ -1,13 +1,13 @@
 {
     "command": "SHARE",
-    "secret": "123456"
+    "secret": "abcdefghijklmnopqrstuvwxyz0123456789",
     "resource": {
         "name": "Unimelb website",
         "tags": [
             "web",
             "html" ],
         "description": "The main page for the University of Melbourne",
-        "uri": "http://Users",
+        "uri": "file:///",
         "channel": "windy",
         "owner": "day",
         "ezserver": null

@@ -1,15 +1,14 @@
 {
     "command": "QUERY",
-    "relay": false
-    "resource": {
-        "name": "Unimelb website",
+    "relay": true,
+    "resourceTemplate": {
+        "name": "Unimelb",
         "tags": [
-            "web",
-            "html" ],
-        "description": "The main page for the University of Melbourne",
-        "uri": "http://www.unimelb.edu.au",
+            "web" ],
+        "description": "The main page",
+        "uri": "",
         "channel": "windy",
-        "owner": "day",
+        "owner": "",
         "ezserver": null
     }
 }
