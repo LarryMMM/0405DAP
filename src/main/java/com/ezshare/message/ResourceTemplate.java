@@ -119,20 +119,20 @@ public class ResourceTemplate extends Validatable {
 
     /**
      * Check if two resourceTemplate objects match in the query.
-     * @param list  Resource in list.
+     * @param candidate  Resource in candidate.
      * @return  Match or not
      */
 
-    public boolean match(ResourceTemplate list){
-
-        return channel_match(this.channel,list.getChannel())
-                &&owner_match(this.owner,list.getOwner())
-                &&tag_match(this.tags,list.getTag())
-                &&string_match(this.uri,list.getUri())
-                &&(list.getName().contains(this.name)
-                    || list.getDescription().contains(this.description)
-                    || (this.description.equals("")
-                        &&this.name.equals("")));
+    public boolean match(ResourceTemplate candidate){
+        ResourceTemplate query = this;
+        return channel_match(query.channel,candidate.getChannel())
+                &&owner_match(query.owner,candidate.getOwner())
+                &&tag_match(query.tags,candidate.getTag())
+                &&string_match(query.uri,candidate.getUri())
+                &&(candidate.getName().contains(query.name)
+                    || candidate.getDescription().contains(query.description)
+                    || (query.description.equals("")
+                        &&query.name.equals("")));
     }
 
     private static boolean string_match(String s1,String s2){
@@ -148,13 +148,12 @@ public class ResourceTemplate extends Validatable {
     }
     
     private static boolean tag_match(String[] tags1,String[] tags2){
-        boolean match = true;
         for (String t:tags1) {
             if(!Arrays.asList(tags2).contains(t)){
-                match = false;
+                return false;
             }
         }
-        return match;
+        return true;
     }
 
 

@@ -1,6 +1,9 @@
-package com.ezshare.server;
+package com.ezshare;
 
 import com.ezshare.log.LogCustomFormatter;
+import com.ezshare.server.FileList;
+import com.ezshare.server.ServerList;
+import com.ezshare.server.WorkerThread;
 import org.apache.commons.cli.*;
 
 import java.io.IOException;
@@ -12,6 +15,7 @@ import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import javax.net.ServerSocketFactory;
@@ -20,10 +24,10 @@ import javax.net.ServerSocketFactory;
  *
  * @author Wenhao Zhao, Ying Li
  */
-public class ServerInstance {
+public class Server {
 
     /* Configuration */
-    public static String HOST = "localhost:3000";
+    public static String HOST = "localhost";
     public static int PORT = 3000;
     public static final int MAX_THREAD_COUNT = 10;
     public static long EXCHANGE_PERIOD = 600000;
@@ -31,7 +35,7 @@ public class ServerInstance {
     public static String SECRET = random(26);
     public static boolean DEBUG=false;
     
-    public static final Logger logger = LogCustomFormatter.getLogger(ServerInstance.class.getName());
+    public static final Logger logger = LogCustomFormatter.getLogger(Server.class.getName());
     
     private static final FileList fileList = new FileList();
     private static final ServerList serverList = new ServerList();
@@ -99,8 +103,6 @@ public class ServerInstance {
             //parse command line arguments
             CommandLine line = parser.parse(options,args);
 
-            ServerSocket server = factory.createServerSocket(PORT);
-
             if(line.hasOption("advertisedhostname")){
                 HOST = line.getOptionValue("advertisedhostname");
 
@@ -132,6 +134,9 @@ public class ServerInstance {
             logger.info(String.valueOf("using exchange interval period: "+EXCHANGE_PERIOD));
             logger.info("using secret: "+SECRET);
             logger.info("bound to port "+PORT);
+            
+            /* Start listening */
+            ServerSocket server = factory.createServerSocket(PORT);
 
             System.out.println("ServerSocket initialized.");
             System.out.println("Waiting for client connection..");
@@ -150,8 +155,8 @@ public class ServerInstance {
                     /* Assign a worker thread for this socket. */
                     try {
                         threadPool.submit(new WorkerThread(client, fileList, serverList));
-                    }catch (IOException e){
-                        logger.warning(client.getRemoteSocketAddress().toString()+" Cannot create stream");
+                    } catch (IOException e){
+                        logger.log(Level.WARNING, "{0} cannot create stream", client.getRemoteSocketAddress().toString());
                         client.close();
                     }
 
@@ -162,7 +167,7 @@ public class ServerInstance {
             }
         } catch (IOException ex) {
             logger.warning(ex.getMessage());
-        } catch (ParseException e) {
+        } catch (ParseException ex) {
             //If commandline args invalid, show help info.
             HelpFormatter helpFormatter = new HelpFormatter();
             helpFormatter.printHelp("EZShare.Server",options);

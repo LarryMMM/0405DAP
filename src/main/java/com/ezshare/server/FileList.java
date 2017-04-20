@@ -1,16 +1,9 @@
 package com.ezshare.server;
 
-import com.ezshare.message.FileTemplate;
 import com.ezshare.message.ResourceTemplate;
 
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -87,17 +80,17 @@ public class FileList {
      * search a certain list of file by owner, uri and channel in filelist
      *
      *
-     * @param resourceTemplate  Resource in query.
+     * @param query  Resource in query.
      * @return querylist    List of resources that match the query.
      *
      * */
-    public List<ResourceTemplate> query(ResourceTemplate resourceTemplate) {
+    public List<ResourceTemplate> query(ResourceTemplate query) {
         lock.readLock().lock();
         List<ResourceTemplate> queryList = new ArrayList<>();
         try{
-            for(ResourceTemplate f : resourceTemplateList) {
-                if (resourceTemplate.match(f)) {
-                    queryList.add(f);
+            for(ResourceTemplate candidate : resourceTemplateList) {
+                if (query.match(candidate)) {
+                    queryList.add(candidate);
                 }
             }
             return queryList;
@@ -106,5 +99,23 @@ public class FileList {
         }
     }
     
-    
+    /*
+        I guess the query rule of "fetch" is different from that of "query"?
+    */
+    public List<ResourceTemplate> fetch(ResourceTemplate query) {
+        lock.readLock().lock();
+        List<ResourceTemplate> fetch = new ArrayList<>();
+        try{
+            for(ResourceTemplate candidate : resourceTemplateList) {
+                if (query.getChannel().equals(candidate.getChannel()) && 
+                    query.getUri().equals(candidate.getUri())) {
+                    fetch.add(candidate);
+                    return fetch;
+                }
+            }
+            return fetch;
+        }finally {
+            lock.readLock().unlock();
+        }
+    }    
 }
