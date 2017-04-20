@@ -1,0 +1,14 @@
+{
+    "command": "FETCH",
+    "resource": {
+        "name": "Unimelb website",
+        "tags": [
+            "web",
+            "html" ],
+        "description": "The main page for the University of Melbourne",
+        "uri": "file:///Users/", #enter a file that exists
+        "channel": "windy",
+        "owner": "day",
+        "ezserver": null
+    }
+}
