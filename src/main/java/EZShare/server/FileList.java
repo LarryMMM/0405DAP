@@ -1,6 +1,6 @@
-package com.ezshare.server;
+package EZShare.server;
 
-import com.ezshare.message.ResourceTemplate;
+import EZShare.message.ResourceTemplate;
 
 import java.util.ArrayList;
 import java.util.List;

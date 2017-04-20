@@ -1,11 +1,20 @@
-package com.ezshare.server;
+package EZShare.server;
 
-import com.ezshare.Server;
+import EZShare.message.ExchangeMessage;
+import EZShare.message.FileTemplate;
+import EZShare.message.Message;
+import EZShare.message.ResourceTemplate;
+import EZShare.message.FetchMessage;
+import EZShare.message.QueryMessage;
+import EZShare.message.PublishMessage;
+import EZShare.message.Host;
+import EZShare.message.ShareMessage;
+import EZShare.message.RemoveMessage;
+import EZShare.Server;
 import java.io.*;
 import java.net.*;
 import java.util.*;
 
-import com.ezshare.message.*;
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
 import java.util.logging.Level;

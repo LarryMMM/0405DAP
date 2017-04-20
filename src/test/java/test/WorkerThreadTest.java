@@ -1,9 +1,9 @@
 package test;
 
-import com.ezshare.Server;
-import com.ezshare.server.FileList;
-import com.ezshare.server.ServerList;
-import com.ezshare.server.WorkerThread;
+import EZShare.Server;
+import EZShare.server.FileList;
+import EZShare.server.ServerList;
+import EZShare.server.WorkerThread;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;

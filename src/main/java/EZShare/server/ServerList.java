@@ -1,8 +1,8 @@
-package com.ezshare.server;
+package EZShare.server;
 
-import com.ezshare.Server;
-import com.ezshare.message.ExchangeMessage;
-import com.ezshare.message.Host;
+import EZShare.Server;
+import EZShare.message.ExchangeMessage;
+import EZShare.message.Host;
 import com.google.gson.Gson;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;

@@ -1,9 +1,9 @@
-package com.ezshare;
+package EZShare;
 
-import com.ezshare.log.LogCustomFormatter;
-import com.ezshare.server.FileList;
-import com.ezshare.server.ServerList;
-import com.ezshare.server.WorkerThread;
+import EZShare.log.LogCustomFormatter;
+import EZShare.server.FileList;
+import EZShare.server.ServerList;
+import EZShare.server.WorkerThread;
 import org.apache.commons.cli.*;
 
 import java.io.IOException;

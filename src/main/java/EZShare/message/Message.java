@@ -1,4 +1,4 @@
-package com.ezshare.message;
+package EZShare.message;
 
 import com.google.gson.Gson;
 

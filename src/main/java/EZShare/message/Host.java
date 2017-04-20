@@ -1,4 +1,4 @@
-package com.ezshare.message;
+package EZShare.message;
 
 /**
  * Encapsulation of Hostname and port #

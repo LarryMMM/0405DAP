@@ -1,4 +1,4 @@
-package com.ezshare.message;
+package EZShare.message;
 
 import java.net.URISyntaxException;
 

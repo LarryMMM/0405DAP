@@ -1,4 +1,4 @@
-package com.ezshare.log;
+package EZShare.log;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;

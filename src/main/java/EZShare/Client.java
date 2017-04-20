@@ -1,10 +1,17 @@
-package com.ezshare;
+package EZShare;
 
+import EZShare.message.ExchangeMessage;
+import EZShare.message.ResourceTemplate;
+import EZShare.message.FetchMessage;
+import EZShare.message.QueryMessage;
+import EZShare.message.PublishMessage;
+import EZShare.message.RemoveMessage;
+import EZShare.message.ShareMessage;
+import EZShare.message.Host;
+import EZShare.log.LogCustomFormatter;
 import java.io.*;
 
-import com.ezshare.message.*;
-import com.ezshare.log.*;
-import com.ezshare.message.FileTemplate;
+import EZShare.message.FileTemplate;
 import com.google.gson.Gson;
 import org.apache.commons.cli.*;
 
