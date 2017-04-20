@@ -47,7 +47,7 @@ public class WorkerThreadTest {
         return w.reception(json);
     }
     
-    private List<String> receptionShareTest(String inputFileName, String filePath, String secret) throws IOException {
+    private List<String> receptionShareOrFetchTest(String inputFileName, String filePath, String secret) throws IOException {
         BufferedReader br = new BufferedReader(new FileReader(System.getProperty("user.dir") + "/src/test/java/test/jsons/" + inputFileName));
         String json = "";
         for (String line = br.readLine(); line != null; line = br.readLine()) {
@@ -287,7 +287,7 @@ public class WorkerThreadTest {
     public void shareSuccess() {
        try {
             refreshWorkerThread();
-            outputJsons = receptionShareTest("ShareSuccess", existingFilePath, Server.SECRET);
+            outputJsons = receptionShareOrFetchTest("ShareSuccess", existingFilePath, Server.SECRET);
             checkIndexContentAndDisplay(0, "success");
         } catch (IOException e) {
             Assert.fail(e.getMessage());
@@ -298,7 +298,7 @@ public class WorkerThreadTest {
     public void shareIncorrectSecret() {
        try {
             refreshWorkerThread();
-            outputJsons = receptionShareTest("ShareIncorrectSecret", existingFilePath, "9527");
+            outputJsons = receptionShareOrFetchTest("ShareIncorrectSecret", existingFilePath, "9527");
             checkIndexContentAndDisplay(0, "incorrect secret");
         } catch (IOException e) {
             Assert.fail(e.getMessage());
@@ -309,7 +309,7 @@ public class WorkerThreadTest {
     public void shareInvalid() {
        try {
             refreshWorkerThread();
-            outputJsons = receptionShareTest("ShareIncorrectSecret", "http://User", Server.SECRET);
+            outputJsons = receptionShareOrFetchTest("ShareIncorrectSecret", "http://User", Server.SECRET);
             checkIndexContentAndDisplay(0, "invalid resource");
         } catch (IOException e) {
             Assert.fail(e.getMessage());
@@ -320,7 +320,7 @@ public class WorkerThreadTest {
     public void shareMissingResource() {
        try {
             refreshWorkerThread();
-            outputJsons = receptionShareTest("ShareMissingResource", "", Server.SECRET);
+            outputJsons = receptionShareOrFetchTest("ShareMissingResource", "", Server.SECRET);
             checkIndexContentAndDisplay(0, "missing resource and/or secret");
         } catch (IOException e) {
             Assert.fail(e.getMessage());
@@ -331,7 +331,7 @@ public class WorkerThreadTest {
     public void shareRulesBroken() {
        try {
             refreshWorkerThread();
-            outputJsons = receptionShareTest("ShareRulesBroken", existingFilePath + "f", Server.SECRET);
+            outputJsons = receptionShareOrFetchTest("ShareRulesBroken", existingFilePath + "f", Server.SECRET);
             checkIndexContentAndDisplay(0, "cannot share resource");
         } catch (IOException e) {
             Assert.fail(e.getMessage());
@@ -346,10 +346,11 @@ public class WorkerThreadTest {
        try {
             refreshWorkerThread();
             /* Prepare a file to be fetched */
-            receptionShareTest("ShareSuccess", existingFilePath, Server.SECRET);
+            receptionShareOrFetchTest("ShareSuccess", existingFilePath, Server.SECRET);
             /* Fetch it! */
-            outputJsons = receptionShareTest("FetchSuccess", existingFilePath, "何と無く");
+            outputJsons = receptionShareOrFetchTest("FetchSuccess", existingFilePath, "何と無く");
             checkIndexContentAndDisplay(2, existingFilePath);
+            checkIndexContentAndDisplay(3, "\"resultSize\":1");
         } catch (IOException e) {
             Assert.fail(e.getMessage());
         } 
@@ -375,5 +376,19 @@ public class WorkerThreadTest {
         } catch (IOException e) {
             Assert.fail(e.getMessage());
         } 
-    }    
+    }
+
+    @Test
+    public void fetchNoMatchedFile() {
+       try {
+            refreshWorkerThread();
+            /* Prepare a similar file, but not to be fetched */
+            receptionShareOrFetchTest("ShareSuccess", existingFilePath, Server.SECRET);
+            /* Fetch it! */
+            outputJsons = receptionShareOrFetchTest("FetchNoMatchedFile", existingFilePath + "f", "何と無く");
+            checkIndexContentAndDisplay(1, "\"resultSize\":0");
+        } catch (IOException e) {
+            Assert.fail(e.getMessage());
+        } 
+    }     
 }

@@ -128,7 +128,9 @@ public class WorkerThread extends Thread {
             }
 
             ResourceTemplate r = publishMessage.getResource();
-            r.setEzserver(Server.HOST);
+            
+            r.setEzserver(Server.HOST + ":" + Server.PORT);
+            
             if (!publishMessage.isValid()) {
                 Server.logger.log(Level.WARNING, "{0} : invalid resource", this.ClientAddress);
                 outputJsons.add(getErrorMessageJson("invalid resource"));
@@ -183,7 +185,9 @@ public class WorkerThread extends Thread {
             }
 
             ResourceTemplate r = shareMessage.getResource();
-            r.setEzserver(Server.HOST);
+            
+            r.setEzserver(Server.HOST + ":" + Server.PORT);
+            
             if (!shareMessage.isValid()) {
                 //resource not valid
                 Server.logger.log(Level.WARNING, "{0} : invalid resource", this.ClientAddress);
@@ -324,7 +328,7 @@ public class WorkerThread extends Thread {
                 Server.logger.log(Level.WARNING, "{0} : invalid resourceTemplate", this.ClientAddress);
                 outputJsons.add(getErrorMessageJson("invalid resourceTemplate"));
             } else {
-                List<ResourceTemplate> result = this.fileList.query(r);
+                List<ResourceTemplate> result = this.fileList.fetch(r);
 
                 if (!result.isEmpty()) {
                     RandomAccessFile file;

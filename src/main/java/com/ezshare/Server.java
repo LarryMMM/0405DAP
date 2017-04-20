@@ -27,7 +27,7 @@ import javax.net.ServerSocketFactory;
 public class Server {
 
     /* Configuration */
-    public static String HOST = "localhost:3000";
+    public static String HOST = "localhost";
     public static int PORT = 3000;
     public static final int MAX_THREAD_COUNT = 10;
     public static long EXCHANGE_PERIOD = 600000;
@@ -103,8 +103,6 @@ public class Server {
             //parse command line arguments
             CommandLine line = parser.parse(options,args);
 
-            ServerSocket server = factory.createServerSocket(PORT);
-
             if(line.hasOption("advertisedhostname")){
                 HOST = line.getOptionValue("advertisedhostname");
 
@@ -136,6 +134,9 @@ public class Server {
             logger.info(String.valueOf("using exchange interval period: "+EXCHANGE_PERIOD));
             logger.info("using secret: "+SECRET);
             logger.info("bound to port "+PORT);
+            
+            /* Start listening */
+            ServerSocket server = factory.createServerSocket(PORT);
 
             System.out.println("ServerSocket initialized.");
             System.out.println("Waiting for client connection..");

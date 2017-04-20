@@ -1,7 +1,8 @@
 {
     "command": "FETCH",
     "resourceTemplate": {
-        "uri": "http:///",
+        "uri": "file:///",
         "channel": "windy"
     }
 }
+
