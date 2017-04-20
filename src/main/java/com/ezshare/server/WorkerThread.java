@@ -428,23 +428,26 @@ public class WorkerThread extends Thread {
     public void sendBackMessage(List<String> jsons) {
         try {
             for (String json : jsons) {
-                /* If json.charAt(0) != '{', it muse be a file URI. */
-                if (json.charAt(0) == '{') {
-                    output.writeUTF(json);
-                    output.flush();
-                } else {
-                    RandomAccessFile file;
-                    file = new RandomAccessFile(new File(new URI(json).getPath()), "r");
+                /* If json.length() == 0 (barely happens), do nothing at the moment. */
+                if (json.length() != 0) {
+                    /* If json.charAt(0) != '{', it muse be a file URI. */
+                    if (json.charAt(0) == '{') {
+                        output.writeUTF(json);
+                        output.flush();
+                    } else {
+                        RandomAccessFile file;
+                        file = new RandomAccessFile(new File(new URI(json).getPath()), "r");
 
-                    byte[] sendingBuffer = new byte[1024 * 1024];
-                    int num;
-                    // While there are still bytes to send..
-                    Server.logger.log(Level.INFO, "{0} : start sending file {1}", new Object[]{this.ClientAddress, json});
-                    while ((num = file.read(sendingBuffer)) > 0) {
-                        output.write(Arrays.copyOf(sendingBuffer, num));
+                        byte[] sendingBuffer = new byte[1024 * 1024];
+                        int num;
+                        // While there are still bytes to send..
+                        Server.logger.log(Level.INFO, "{0} : start sending file {1}", new Object[]{this.ClientAddress, json});
+                        while ((num = file.read(sendingBuffer)) > 0) {
+                            output.write(Arrays.copyOf(sendingBuffer, num));
+                        }
+                        Server.logger.log(Level.FINE, "{0} : successfully sent {1}", new Object[]{this.ClientAddress, json});
+                        file.close();
                     }
-                    Server.logger.log(Level.FINE, "{0} : successfully sent {1}", new Object[]{this.ClientAddress, json});
-                    file.close();
                 }
             }
         } catch (IOException e) {

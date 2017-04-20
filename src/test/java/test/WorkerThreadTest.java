@@ -1,13 +1,10 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package test;
 
 import com.ezshare.server.FileList;
 import com.ezshare.server.ServerList;
 import com.ezshare.server.WorkerThread;
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.IOException;
 import java.net.Socket;
 import java.util.List;
@@ -16,18 +13,56 @@ import org.junit.Test;
 
 /**
  *
- * @author nek
+ * @author Wenhao Zhao
  */
 public class WorkerThreadTest {
 
-    @Test
-    public void testRun() {
+    private WorkerThread w;
+    private List<String> outputJsons = null;
+    
+    public WorkerThreadTest() {
         try {
-            WorkerThread w = new WorkerThread(new Socket(), new FileList(), new ServerList());
-            List<String> outputJsons = w.reception("{command:\"haha\"}");
-            Assert.assertEquals(1, outputJsons.size());
-        } catch (IOException ex) {
-            System.out.println(ex.getMessage());
+            w = new WorkerThread(new Socket(), new FileList(), new ServerList());
+        } catch (IOException e) {
+            Assert.fail(e.getMessage());
         }
+    }
+    
+    @Test
+    public void publishSuccess() throws IOException {
+        try {
+            outputJsons = receptionTest("PublishSuccess");
+            checkIndexContentAndDisplay(0, "success");
+        } catch (IOException e) {
+            Assert.fail(e.getMessage());
+        } 
+    }
+
+    @Test
+    public void publishRulesBroken() {
+        try {
+            receptionTest("PublishSuccess");
+            /* Same channel and URI but different owner */
+            outputJsons = receptionTest("PublishRulesBroken");
+            checkIndexContentAndDisplay(0, "cannot publish resource");
+        } catch (IOException e) {
+            Assert.fail(e.getMessage());
+        } 
+    }
+
+    private List<String> receptionTest(String inputFileName) throws IOException {
+        BufferedReader br = new BufferedReader(new FileReader(System.getProperty("user.dir") + "/src/test/java/test/jsons/" + inputFileName));
+        String json = "";
+        for (String line = br.readLine(); line != null; line = br.readLine()) {
+            json += line;
+            json += '\n';
+        }
+        
+        return w.reception(json);
+    }
+    
+    private void checkIndexContentAndDisplay(int index, String subMessageContent) {
+        System.out.println(outputJsons.get(index));
+        Assert.assertEquals(true, outputJsons.get(index).contains(subMessageContent));
     }
 }
