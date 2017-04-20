@@ -100,7 +100,7 @@ public class ResourceTemplate extends Validatable {
     public boolean isValidFile(){
         try {
             URI u = new URI(this.uri);
-            return (u.getScheme().equals("file")&&u.getPath()!=null&&u.isAbsolute());
+            return (u.getScheme()!=null&&u.getScheme().equals("file")&&u.getPath()!=null&&u.isAbsolute());
         }catch (URISyntaxException e){
             return false;
         }
