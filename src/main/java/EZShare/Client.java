@@ -20,6 +20,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
@@ -342,8 +343,6 @@ public class Client {
 
                 int resource_size = (int) receivedFileTemplate.getResourceSize();
 
-                byte[] download = new byte[resource_size];
-
                 String name = new File(receivedFileTemplate.getUri()).getName();
                 //System.out.println(name);
 
@@ -354,15 +353,38 @@ public class Client {
                 }
 
                 //create file
-                FileOutputStream fileOutputStream = new FileOutputStream(download_path + name);
+                RandomAccessFile randomAccessFile = new RandomAccessFile(download_path + name, "rw");
 
-                //read exact all file bytes from server
-                input.readFully(download);
+                //set read buffer size
+                int buffer_size = 1024;
+                byte[] buffer = new byte[buffer_size];
 
-                //write file
-                fileOutputStream.write(download);
+                //total bytes received
+                int total_received = 0;
 
-                fileOutputStream.close();
+                // # of bytes received per time
+                int received = 0;
+
+                //read byte from socket until the last chunk
+                while((received = input.read(buffer))!=-1){
+                    //write file
+                    randomAccessFile.write(Arrays.copyOf(buffer, received));
+                    //note down how many bytes received
+                    total_received += received;
+                    //if there is only one chunk to receive, break to prevent the lost of result_size information
+                    if(resource_size - total_received < buffer_size)
+                            break;
+                }
+
+                //set the buffer to the length of the last chunk
+                buffer = new byte[resource_size - total_received];
+
+                //read last chunk and write to file
+                received = input.read(buffer);
+                randomAccessFile.write(Arrays.copyOf(buffer,received));
+
+                //close file
+                randomAccessFile.close();
 
                 //read resourceSize
                 response = input.readUTF();
