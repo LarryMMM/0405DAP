@@ -371,18 +371,20 @@ public class Client {
                     randomAccessFile.write(Arrays.copyOf(buffer, received));
                     //note down how many bytes received
                     total_received += received;
+                    //System.out.println(received);
                     //if there is only one chunk to receive, break to prevent the lost of result_size information
                     if(resource_size - total_received < buffer_size)
                             break;
                 }
 
-                //set the buffer to the length of the last chunk
-                buffer = new byte[resource_size - total_received];
+                if(resource_size - total_received>0) {
+                    //set the buffer to the length of the last chunk
+                    buffer = new byte[resource_size - total_received];
 
-                //read last chunk and write to file
-                received = input.read(buffer);
-                randomAccessFile.write(Arrays.copyOf(buffer,received));
-
+                    //read last chunk and write to file
+                    received = input.read(buffer);
+                    randomAccessFile.write(Arrays.copyOf(buffer, received));
+                }
                 //close file
                 randomAccessFile.close();
 
