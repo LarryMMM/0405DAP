@@ -357,29 +357,32 @@ public class Client {
 
                 //set read buffer size
                 int buffer_size = 1024;
+
+                buffer_size = resource_size>buffer_size?buffer_size:resource_size;
+
                 byte[] buffer = new byte[buffer_size];
 
-                //total bytes received
-                int total_received = 0;
+                // # of bytes to be received
+                int to_receive = resource_size;
 
                 // # of bytes received per time
-                int received = 0;
+                int received;
 
                 //read byte from socket until the last chunk
-                while((received = input.read(buffer))!=-1){
+                while(to_receive>buffer_size&&(received = input.read(buffer))!=-1){
                     //write file
                     randomAccessFile.write(Arrays.copyOf(buffer, received));
                     //note down how many bytes received
-                    total_received += received;
-                    //System.out.println(received);
+                    to_receive -= received;
+
+                    //System.out.println(to_receive);
                     //if there is only one chunk to receive, break to prevent the lost of result_size information
-                    if(resource_size - total_received < buffer_size)
-                            break;
+
                 }
 
-                if(resource_size - total_received>0) {
+                if(to_receive>0) {
                     //set the buffer to the length of the last chunk
-                    buffer = new byte[resource_size - total_received];
+                    buffer = new byte[to_receive];
 
                     //read last chunk and write to file
                     received = input.read(buffer);
