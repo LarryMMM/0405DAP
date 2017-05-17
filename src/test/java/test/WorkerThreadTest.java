@@ -19,7 +19,7 @@ import org.junit.Test;
 public class WorkerThreadTest {
 
     /* Please configure an existing and accessible file path before commencing testing. */
-    private final String existingFilePath = "file:///Users/nek/Desktop/DSProj1/GroupPlan.md";
+    private final String existingFilePath = "file:///Users/nek/.bash_profile";
     
     private WorkerThread w = null;
     private List<String> outputJsons = null;
