@@ -304,7 +304,8 @@ public class WorkerThread extends Thread {
                 //append result set by querying remote servers
                 for (Host h : this.serverList.getServerList()) {
                     List<ResourceTemplate> rtl = doSingleQueryRelay(h, relayMessage);
-                    result.addAll(rtl);
+                    if(!rtl.isEmpty())
+                        result.addAll(rtl);
                 }
 
                 outputJsons.add(getSuccessMessageJson());
