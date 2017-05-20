@@ -1,17 +1,9 @@
 package EZShare;
 
-import EZShare.message.ExchangeMessage;
-import EZShare.message.ResourceTemplate;
-import EZShare.message.FetchMessage;
-import EZShare.message.QueryMessage;
-import EZShare.message.PublishMessage;
-import EZShare.message.RemoveMessage;
-import EZShare.message.ShareMessage;
-import EZShare.message.Host;
+import EZShare.message.*;
 import EZShare.log.LogCustomFormatter;
 import java.io.*;
 
-import EZShare.message.FileTemplate;
 import com.google.gson.Gson;
 import org.apache.commons.cli.*;
 
@@ -43,6 +35,11 @@ public class Client {
     private static Options commandOptions() {
         //Build up command line options
         Options options = new Options();
+        options.addOption("relay", false, "set true to relay the request to other servers");
+        options.addOption("id", true, "set the ID for subscribe request");
+        options.addOption("subscribe", false, "subscribe resource from server");
+        options.addOption("secure", false, "set true to initiate secure connection");
+        options.addOption("sport", true, "server secure port, an integer");
         options.addOption("debug", false, "print debug information");
         options.addOption("fetch", false, "fetch resource from server");
         options.addOption("channel", true, "channel");
@@ -91,6 +88,9 @@ public class Client {
             count++;
         }
         if (line.hasOption("fetch")) {
+            count++;
+        }
+        if( line.hasOption("subscribe")){
             count++;
         }
         return count == 1;
@@ -403,6 +403,64 @@ public class Client {
 
     }
 
+    /**
+     * Process subscribe command.
+     *
+     * @param socket The socket connected to target server.
+     * @param resourceTemplate The query condition of subscribed resources.
+     * @param relay Whether the subscribe command will be relayed to other servers.
+     * @param id    The id of the subscription.
+     * @throws IOException  Exception in data stream.
+     */
+    private static void subscribeCommand(Socket socket, ResourceTemplate resourceTemplate, boolean relay, String id) throws IOException{
+        DataInputStream input = new DataInputStream(socket.getInputStream());
+        DataOutputStream output = new DataOutputStream(socket.getOutputStream());
+
+        logger.fine("subscribing to " + socket.getRemoteSocketAddress());
+
+        //construct subscribe message.
+        SubscribeMessage subscribeMessage = new SubscribeMessage(relay,id,resourceTemplate);
+
+        String JSON = gson.toJson(subscribeMessage);
+        sendMessage(output, JSON);
+
+        String response = input.readUTF();
+
+        //if successfully subscribed
+        if(response.contains("success")){
+            logger.fine("RECEIVED:" + response);
+
+            //hold connection until press enter.
+            while (System.in.available()==0){
+
+                //check available resource and print out.
+                if(input.available()!=0){
+                    String resource = input.readUTF();
+                    System.out.println(resource);
+                }
+
+            }
+
+            //Termination
+            //construct unsubscribe message.
+            UnsubscribeMessage unsubscribeMessage = new UnsubscribeMessage(id);
+
+            JSON = gson.toJson(unsubscribeMessage);
+            sendMessage(output,JSON);
+
+            //read result size
+            response = input.readUTF();
+
+            logger.info("RECEIVED:" + response);
+
+
+        }else if(response.contains("error")){
+            logger.warning("RECEIVED:" + response);
+        }
+
+
+    }
+
     public static void main(String[] args) {
 
         //Initialize command line parser and options
@@ -489,6 +547,13 @@ public class Client {
                 } else {
                     fetchCommand(socket, resourceTemplate);
                 }
+            }
+
+            if (line.hasOption("subscribe")){
+                boolean relay = line.hasOption("relay");
+                //set local IP address as default ID.
+                String id = line.getOptionValue("id", socket.getLocalAddress().toString());
+                subscribeCommand(socket,resourceTemplate,relay,id);
             }
 
             if (error_message != null) {
