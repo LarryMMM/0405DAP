@@ -11,10 +11,9 @@ import org.apache.commons.cli.*;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.Random;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.Level;
@@ -30,7 +29,8 @@ public class Server {
 
     /* Configuration */
     public static String HOST = "localhost";
-    public static int PORT = 3000;
+    public static int PORT = 3780;
+    public static int SPORT = 3781;
     public static final int MAX_THREAD_COUNT = 10;
     public static long EXCHANGE_PERIOD = 600000;
     public static long INTERVAL = 1000;
@@ -52,7 +52,11 @@ public class Server {
     */
     private static ConcurrentHashMap<String, Long> intervalLimit = new ConcurrentHashMap<>();
 
-    public static ConcurrentHashMap<Socket, Subscription> unrelaysubscription = new ConcurrentHashMap<>();
+    public static ConcurrentHashMap<Socket,Subscription> subscriptions = new ConcurrentHashMap<>();
+
+    public static ConcurrentHashMap<Socket,Subscription> secure_relay = new ConcurrentHashMap<>();
+
+    public static ConcurrentHashMap<Socket,Subscription> unsecure_relay = new ConcurrentHashMap<>();
 
     /**
      * Construct command line options

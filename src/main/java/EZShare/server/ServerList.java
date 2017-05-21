@@ -44,8 +44,10 @@ public class ServerList {
         for (Host inputHost : inputServerList) {
             /* 
                 Discard host if (1) already in the list (2) is a local address
+
             */
-            if (!containsHost(inputHost) && !isMyIpAddress(inputHost.getHostname())) {
+            if (!containsHost(inputHost) &&
+                    !(isMyIpAddress(inputHost.getHostname()) && (inputHost.getPort()==Server.PORT||inputHost.getPort()==Server.SPORT))) {
                 serverList.add(inputHost);
                 ++addCount;
             }

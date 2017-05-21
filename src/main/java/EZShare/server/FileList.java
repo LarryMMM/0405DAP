@@ -33,7 +33,7 @@ public class FileList {
     public void sendNotification(ResourceTemplate candidate){
 
         //Travers all unrelayed subscriptions.
-        for (Map.Entry<Socket,Subscription> s: Server.unrelaysubscription.entrySet()) {
+        for (Map.Entry<Socket,Subscription> s: Server.subscriptions.entrySet()) {
             //get query conditions
             ResourceTemplate query = s.getValue().getSubscribeMessage().getResourceTemplate();
             //get socket
@@ -48,7 +48,7 @@ public class FileList {
                     output.flush();
                     Server.logger.log(Level.FINE,"Matched resource sent:"+candidate,socket.getRemoteSocketAddress().toString());
                     //increase result size
-                    Server.unrelaysubscription.get(socket).addResult(1);
+                    Server.subscriptions.get(socket).addResult(1);
 
                 }catch (IOException e){
                     Server.logger.log(Level.WARNING,"{0} IOException when sending subscribed resource!"+e.getMessage());

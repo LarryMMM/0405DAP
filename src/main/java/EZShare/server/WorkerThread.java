@@ -8,6 +8,8 @@ import java.util.*;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
+
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 
 /**
@@ -19,7 +21,9 @@ public class WorkerThread extends Thread {
     private Socket client;
     private FileList fileList;
     private ServerList serverList;
+    private ConcurrentHashMap<Socket,Subscription> relay;
 
+    private boolean secure;
     private DataOutputStream output;
     private DataInputStream input;
     private String ClientAddress;
@@ -42,10 +46,17 @@ public class WorkerThread extends Thread {
     public void run() {
         try {
             /* Socket opened. */
-            this.client.setSoTimeout(3000);
+
             this.ClientAddress = client.getRemoteSocketAddress().toString();
             this.input = new DataInputStream(client.getInputStream());
             this.output = new DataOutputStream(client.getOutputStream());
+
+            if(secure){
+                this.relay = Server.secure_relay;
+            }else{
+                this.relay = Server.unsecure_relay;
+            }
+
             Server.logger.log(Level.INFO, "{0} : Connected!", this.ClientAddress);
 
             /* Get input data. Remove \0 in order to prevent crashing. */
@@ -61,6 +72,7 @@ public class WorkerThread extends Thread {
             Server.logger.log(Level.WARNING, "{0} : Socket Timeout", this.ClientAddress);
         } catch (IOException e) {
             /* Socket time out in establishing. */
+            e.printStackTrace();
             Server.logger.log(Level.WARNING, "{0} : IOException!", this.ClientAddress);
         } finally {
             try {
@@ -91,6 +103,8 @@ public class WorkerThread extends Thread {
         }
 
         if (!jsonSyntaxException) {
+            if(!message.getCommand().equals("SUBSCRIBE"))
+                this.client.setSoTimeout(3000);
             switch (message.getCommand()) {
                 case "PUBLISH":
                     processPublish(outputJsons, inputJson);
@@ -123,7 +137,6 @@ public class WorkerThread extends Thread {
     }
 
     public void processSubscribe(List<String> outputJsons, String JSON) throws IOException{
-        this.client.setSoTimeout(0);
         try{
             SubscribeMessage subscribeMessage = gson.fromJson(JSON, SubscribeMessage.class);
 
@@ -139,8 +152,6 @@ public class WorkerThread extends Thread {
                 //handle unrelayed subscription.
             } else if(!subscribeMessage.isRelay()){
 
-                Server.logger.log(Level.FINE, "{0} : Resource subscribed!(relay=false)", this.ClientAddress);
-
                 //send success message.
                 String response = getSubscribeSuccessMessageJson(subscribeMessage.getId());
 
@@ -148,30 +159,101 @@ public class WorkerThread extends Thread {
                 this.output.flush();
 
                 //put the subscription in list
-                Server.unrelaysubscription.put(this.client, new Subscription(subscribeMessage));
+                Server.subscriptions.put(this.client, new Subscription(subscribeMessage,this.ClientAddress));
+
+                Server.logger.log(Level.FINE, "{0} : Resource subscribed!(relay=false)", this.ClientAddress);
 
                 //block until user terminate.
-                for(String unsub = this.input.readUTF();!unsub.contains("UNSUBSCRIBE");){}
 
-                int size = Server.unrelaysubscription.get(client).getReusltsize();
-                Server.logger.log(Level.INFO,"Terminating subscription with resultsize:"+size,this.ClientAddress);
+                while (!isTerminated()){}
+
+                int size = Server.subscriptions.get(client).getReusltsize();
+                Server.logger.log(Level.INFO,"{0} : Terminating subscription with resultsize:"+size,this.ClientAddress);
 
                 String resultsize = getResultSizeJson((long)size);
 
-                this.output.writeUTF(resultsize);
-                this.output.flush();
+                Server.subscriptions.remove(client);
 
-                Server.unrelaysubscription.remove(client);
+                outputJsons.add(resultsize);
 
             } else if(subscribeMessage.isRelay()){
-                /*
-                *
-                *
-                *   TO-DO!
-                *
-                *
-                *
-                * */
+                int size = 0;
+
+                //add to local subscriptions
+                Server.subscriptions.put(this.client, new Subscription(subscribeMessage,this.ClientAddress));
+
+
+                //create remote subscription sockets
+
+                for (Host h:this.serverList.getServerList()) {
+                    Server.logger.log(Level.FINE, "{0} : relaying to", h.toString());
+                    doSingleSubscriberRelay(h,subscribeMessage);
+                }
+
+                //send success message.
+                String response = getSubscribeSuccessMessageJson(subscribeMessage.getId());
+
+                this.output.writeUTF(response);
+                this.output.flush();
+
+                Server.logger.log(Level.FINE, "{0} : Resource subscribed!(relay=true)", this.ClientAddress);
+
+                //wait for user to terminate
+                while(!isTerminated()){
+
+
+                    //listen to remote subscriptions
+                    for (ConcurrentHashMap.Entry<Socket,Subscription> s : this.relay.entrySet()) {
+                        //if the socket is relayed for this client
+                        if (s.getValue().getOrgin().equals(this.ClientAddress)) {
+                            Socket relayed = s.getKey();
+                            DataInputStream inputStream = new DataInputStream(relayed.getInputStream());
+
+                            //read until exception
+                            while (true) {
+                                //Server.logger.log(Level.FINE, "{0} : listening", this.ClientAddress);
+                                relayed.setSoTimeout(1);
+                                try {
+                                    //read resource from other servers
+                                    String resource = inputStream.readUTF();
+                                    //write resource to subscriber
+                                    this.output.writeUTF(resource);
+                                    this.output.flush();
+                                    Server.logger.log(Level.FINE, "{0} : Resource Forwarded!"+resource, this.ClientAddress);
+                                    size++;
+
+                                } catch (IOException e) {
+                                    //end reading and goto next socket
+                                    break;
+                                }
+                            }
+
+                        }
+                    }
+
+                }
+
+                //close remote subscriptions
+                for (ConcurrentHashMap.Entry<Socket, Subscription> s : this.relay.entrySet()){
+                    if(s.getValue().getOrgin().equals(this.ClientAddress)){
+                        closeSubscription(s.getKey(),s.getValue());
+                        //remove remote subscription
+                        this.relay.remove(s.getKey());
+                    }
+                }
+
+                //calculate total size
+                size += Server.subscriptions.get(client).getReusltsize();
+
+                Server.logger.log(Level.INFO,"{0} : Terminating subscription with resultsize:"+size,this.ClientAddress);
+
+                String resultsize = getResultSizeJson((long)size);
+
+                //remove local subscription
+                Server.subscriptions.remove(client);
+
+                outputJsons.add(resultsize);
+
             }
 
 
@@ -429,6 +511,114 @@ public class WorkerThread extends Thread {
             Server.logger.log(Level.WARNING, "{0} : unable to create URI", this.ClientAddress);
             outputJsons.add(getErrorMessageJson("cannot fetch resource"));
         }
+    }
+
+    /**
+     * Make a single relay subscription to remote server.
+     * @param host  Remote server.
+     * @param subscribeMessage  The message client sent.(Should be forwarded)
+     */
+
+    public void doSingleSubscriberRelay(Host host, SubscribeMessage subscribeMessage){
+        try{
+
+            Socket socket = new Socket(host.getHostname(), host.getPort());
+            socket.setSoTimeout(3000);
+            Server.logger.log(Level.FINE, "subscribing to {0}", socket.getRemoteSocketAddress().toString());
+
+            DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+            DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
+
+            SubscribeMessage relay_message = new SubscribeMessage(false,subscribeMessage.getId(),subscribeMessage.getResourceTemplate());
+
+            String JSON = gson.toJson(relay_message);
+
+            outputStream.writeUTF(JSON);
+            outputStream.flush();
+
+            String response = inputStream.readUTF();
+
+            if(response.contains("success")){
+                Server.logger.log(Level.FINE, "{0} successful relayed", host.toString());
+                this.relay.put(socket,new Subscription(relay_message,this.ClientAddress, host));
+            }else {
+                Server.logger.log(Level.WARNING, "{0} failed when relaying", host.toString());
+            }
+
+
+        } catch (SocketTimeoutException e) {
+            Server.logger.log(Level.WARNING, "{0} timeout when subscribe relay", host.toString());
+            this.serverList.removeServer(host);
+        } catch (ConnectException e) {
+            Server.logger.log(Level.WARNING, "{0} timeout when create subscribe socket", host.toString());
+            this.serverList.removeServer(host);
+        } catch (IOException e) {
+            Server.logger.log(Level.WARNING, "{0} IOException when subscribe relay", host.toString());
+            this.serverList.removeServer(host);
+        }
+
+
+
+    }
+
+    /**
+     * Handle close up message.
+     * @param socket Socket to close.
+     * @param subscription  Description of this socket.
+     */
+    public void closeSubscription(Socket socket,Subscription subscription){
+        Host host = subscription.getTarget();
+        int resultsize = 0;
+        try{
+            socket.setSoTimeout(3000);
+            DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
+            DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+
+            Server.logger.log(Level.FINE, "{0} : terminating subscribe relay {0}", socket.getRemoteSocketAddress().toString());
+
+            UnsubscribeMessage unsubscribeMessage = new UnsubscribeMessage(subscription.getSubscribeMessage().getId());
+            String JSON = gson.toJson(unsubscribeMessage);
+
+            outputStream.writeUTF(JSON);
+            outputStream.flush();
+
+            String response = inputStream.readUTF();
+
+            if(!response.contains("resultSize")){
+                socket.close();
+                throw new IOException();
+            }
+
+            socket.close();
+
+        }catch (SocketTimeoutException e) {
+            Server.logger.log(Level.WARNING, "{0} timeout when subscribe relay", host.toString());
+            this.serverList.removeServer(host);
+        } catch (ConnectException e) {
+            Server.logger.log(Level.WARNING, "{0} timeout when create subscribe socket", host.toString());
+            this.serverList.removeServer(host);
+        } catch (IOException e) {
+            Server.logger.log(Level.WARNING, "{0} IOException when subscribe relay", host.toString());
+            this.serverList.removeServer(host);
+        }
+
+    }
+
+    /**
+     * Examine input is available without blocking(If java.nio not applicable.)
+     * @return  Whether there is data available.
+     */
+    public boolean isTerminated(){
+
+        try{
+            this.client.setSoTimeout(1);
+            String unsub = this.input.readUTF();
+            this.client.setSoTimeout(3000);
+            return true;
+        }catch (IOException e){
+            return false;
+        }
+
     }
 
     public List<ResourceTemplate> doSingleQueryRelay(Host host, QueryMessage queryMessage) {
