@@ -1,11 +1,19 @@
 package EZShare.server;
 
+import EZShare.Server;
 import EZShare.message.ResourceTemplate;
+import com.google.gson.Gson;
 
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.logging.Level;
 
 /**
  *
@@ -15,6 +23,41 @@ public class FileList {
 
     private List<ResourceTemplate> resourceTemplateList = new ArrayList<>();
     private ReadWriteLock lock = new ReentrantReadWriteLock();
+    private Gson gson = new Gson();
+
+
+    /**
+     * Send notification to socket which linked to the client that subscribed the relevant resources.
+     * @param candidate The published or shared resource.
+     */
+    public void sendNotification(ResourceTemplate candidate){
+
+        //Travers all unrelayed subscriptions.
+        for (Map.Entry<Socket,Subscription> s: Server.unrelaysubscription.entrySet()) {
+            //get query conditions
+            ResourceTemplate query = s.getValue().getSubscribeMessage().getResourceTemplate();
+            //get socket
+            Socket socket = s.getKey();
+
+            //if the resource matches the subscription.
+            if(query.match(candidate)){
+                try {
+                    DataOutputStream output = new DataOutputStream(socket.getOutputStream());
+                    //send resource to that particular socket.
+                    output.writeUTF(gson.toJson(candidate,ResourceTemplate.class));
+                    output.flush();
+                    Server.logger.log(Level.FINE,"Matched resource sent:"+candidate,socket.getRemoteSocketAddress().toString());
+                    //increase result size
+                    Server.unrelaysubscription.get(socket).addResult(1);
+
+                }catch (IOException e){
+                    Server.logger.log(Level.WARNING,"{0} IOException when sending subscribed resource!"+e.getMessage());
+                }
+            }
+        }
+
+    }
+
 
     /**
      * add a new file to filelist
@@ -28,6 +71,7 @@ public class FileList {
         try{
             if(resourceTemplateList.isEmpty()){
                 resourceTemplateList.add(resourceTemplate);
+                sendNotification(resourceTemplate);
                 return true;
             }
 
@@ -37,6 +81,7 @@ public class FileList {
                     if(f.getChannel().equals(resourceTemplate.getChannel()) && f.getUri().equals(resourceTemplate.getUri())){
                         if(f.getOwner().equals(resourceTemplate.getOwner())){
                             resourceTemplateList.set(i, resourceTemplate);
+                            sendNotification(resourceTemplate);
                             return true;
                         }
                         return false;
@@ -44,6 +89,7 @@ public class FileList {
 
                 }
                 resourceTemplateList.add(resourceTemplate);
+                sendNotification(resourceTemplate);
                 return true;
             }
         }finally {

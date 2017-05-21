@@ -1,15 +1,6 @@
 package EZShare.server;
 
-import EZShare.message.ExchangeMessage;
-import EZShare.message.FileTemplate;
-import EZShare.message.Message;
-import EZShare.message.ResourceTemplate;
-import EZShare.message.FetchMessage;
-import EZShare.message.QueryMessage;
-import EZShare.message.PublishMessage;
-import EZShare.message.Host;
-import EZShare.message.ShareMessage;
-import EZShare.message.RemoveMessage;
+import EZShare.message.*;
 import EZShare.Server;
 import java.io.*;
 import java.net.*;
@@ -82,7 +73,7 @@ public class WorkerThread extends Thread {
         }
     }
 
-    public List<String> reception(String inputJson) {
+    public List<String> reception(String inputJson) throws IOException{
         List<String> outputJsons = new LinkedList<>();
         boolean jsonSyntaxException = false;
 
@@ -119,6 +110,9 @@ public class WorkerThread extends Thread {
                 case "QUERY":
                     processQuery(outputJsons, inputJson);
                     break;
+                case "SUBSCRIBE":
+                    processSubscribe(outputJsons, inputJson);
+                    break;
                 default:
                     /* a JSON with field "command", but not in the list above */
                     Server.logger.log(Level.WARNING, "{0} : invalid command", this.ClientAddress);
@@ -127,6 +121,68 @@ public class WorkerThread extends Thread {
         }
         return outputJsons;
     }
+
+    public void processSubscribe(List<String> outputJsons, String JSON) throws IOException{
+        this.client.setSoTimeout(0);
+        try{
+            SubscribeMessage subscribeMessage = gson.fromJson(JSON, SubscribeMessage.class);
+
+            if (subscribeMessage.getResourceTemplate() == null) {
+                throw new JsonSyntaxException("missing resourceTemplate");
+            }
+
+
+            if(!subscribeMessage.isValid()){
+                Server.logger.log(Level.WARNING, "{0} : invalid resourceTemplate", this.ClientAddress);
+                outputJsons.add(getErrorMessageJson("invalid resourceTemplate"));
+
+                //handle unrelayed subscription.
+            } else if(!subscribeMessage.isRelay()){
+
+                Server.logger.log(Level.FINE, "{0} : Resource subscribed!(relay=false)", this.ClientAddress);
+
+                //send success message.
+                String response = getSubscribeSuccessMessageJson(subscribeMessage.getId());
+
+                this.output.writeUTF(response);
+                this.output.flush();
+
+                //put the subscription in list
+                Server.unrelaysubscription.put(this.client, new Subscription(subscribeMessage));
+
+                //block until user terminate.
+                for(String unsub = this.input.readUTF();!unsub.contains("UNSUBSCRIBE");){}
+
+                int size = Server.unrelaysubscription.get(client).getReusltsize();
+                Server.logger.log(Level.INFO,"Terminating subscription with resultsize:"+size,this.ClientAddress);
+
+                String resultsize = getResultSizeJson((long)size);
+
+                this.output.writeUTF(resultsize);
+                this.output.flush();
+
+                Server.unrelaysubscription.remove(client);
+
+            } else if(subscribeMessage.isRelay()){
+                /*
+                *
+                *
+                *   TO-DO!
+                *
+                *
+                *
+                * */
+            }
+
+
+        } catch (JsonSyntaxException e) {
+            Server.logger.log(Level.WARNING, "{0} : missing resourceTemplate", this.ClientAddress);
+            outputJsons.add(getErrorMessageJson("missing resourceTemplate"));
+        }
+
+
+    }
+
 
     public void processPublish(List<String> outputJsons, String JSON) {
         try {
@@ -430,6 +486,13 @@ public class WorkerThread extends Thread {
     public String getSuccessMessageJson() {
         Map<String, String> response = new LinkedHashMap<>();
         response.put("response", "success");
+        return gson.toJson(response, LinkedHashMap.class);
+    }
+
+    public String getSubscribeSuccessMessageJson(String id) {
+        Map<String, String> response = new LinkedHashMap<>();
+        response.put("response", "success");
+        response.put("id",id);
         return gson.toJson(response, LinkedHashMap.class);
     }
 

@@ -413,6 +413,7 @@ public class Client {
      * @throws IOException  Exception in data stream.
      */
     private static void subscribeCommand(Socket socket, ResourceTemplate resourceTemplate, boolean relay, String id) throws IOException{
+
         DataInputStream input = new DataInputStream(socket.getInputStream());
         DataOutputStream output = new DataOutputStream(socket.getOutputStream());
 
@@ -431,16 +432,20 @@ public class Client {
             logger.fine("RECEIVED:" + response);
 
             //hold connection until press enter.
+            socket.setSoTimeout(1);
             while (System.in.available()==0){
 
                 //check available resource and print out.
-                if(input.available()!=0){
+                try {
                     String resource = input.readUTF();
                     System.out.println(resource);
+                }catch (IOException e){
+                    //just to prevent blocking in SSLSocket.
                 }
 
             }
 
+            socket.setSoTimeout(3000);
             //Termination
             //construct unsubscribe message.
             UnsubscribeMessage unsubscribeMessage = new UnsubscribeMessage(id);

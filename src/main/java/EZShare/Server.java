@@ -1,8 +1,10 @@
 package EZShare;
 
 import EZShare.log.LogCustomFormatter;
+import EZShare.message.SubscribeMessage;
 import EZShare.server.FileList;
 import EZShare.server.ServerList;
+import EZShare.server.Subscription;
 import EZShare.server.WorkerThread;
 import org.apache.commons.cli.*;
 
@@ -33,7 +35,6 @@ public class Server {
     public static long EXCHANGE_PERIOD = 600000;
     public static long INTERVAL = 1000;
     public static String SECRET = random(26);
-    public static boolean DEBUG=false;
     
     public static final Logger logger = LogCustomFormatter.getLogger(Server.class.getName());
     
@@ -50,6 +51,8 @@ public class Server {
         A HashMap to record the mapping from a specified client to the starting time of its last connection
     */
     private static ConcurrentHashMap<String, Long> intervalLimit = new ConcurrentHashMap<>();
+
+    public static ConcurrentHashMap<Socket, Subscription> unrelaysubscription = new ConcurrentHashMap<>();
 
     /**
      * Construct command line options
