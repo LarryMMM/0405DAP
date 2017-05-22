@@ -185,9 +185,9 @@ public class WorkerThread extends Thread {
 
                 //create remote subscription sockets
 
-                for (Host h:this.serverList.getServerList()) {
+                for (Host h:this.serverList.getServerList(secure)) {
                     Server.logger.log(Level.FINE, "{0} : relaying to", h.toString());
-                    doSingleSubscriberRelay(h,subscribeMessage);
+                    Server.doSingleSubscriberRelay(this.ClientAddress,h,subscribeMessage, this.secure);
                 }
 
                 //send success message.
@@ -236,9 +236,8 @@ public class WorkerThread extends Thread {
                 //close remote subscriptions
                 for (ConcurrentHashMap.Entry<Socket, Subscription> s : this.relay.entrySet()){
                     if(s.getValue().getOrgin().equals(this.ClientAddress)){
-                        closeSubscription(s.getKey(),s.getValue());
+                        Server.closeSubscription(s.getKey(),s.getValue(),secure);
                         //remove remote subscription
-                        this.relay.remove(s.getKey());
                     }
                 }
 
@@ -386,7 +385,7 @@ public class WorkerThread extends Thread {
 
             if (exchangeMessage.isValid()) {
                 //all servers valid, add to server list.
-                this.serverList.updateServerList(inputServerList);
+                this.serverList.updateServerList(inputServerList,secure);
                 Server.logger.log(Level.FINE, "{0} : servers added", this.ClientAddress);
                 outputJsons.add(getSuccessMessageJson());
             } else {
@@ -440,7 +439,7 @@ public class WorkerThread extends Thread {
                 relayMessage.getResourceTemplate().setChannel("");
 
                 //append result set by querying remote servers
-                for (Host h : this.serverList.getServerList()) {
+                for (Host h : this.serverList.getServerList(secure)) {
                     List<ResourceTemplate> rtl = doSingleQueryRelay(h, relayMessage);
                     if(!rtl.isEmpty())
                         result.addAll(rtl);
@@ -514,97 +513,6 @@ public class WorkerThread extends Thread {
     }
 
     /**
-     * Make a single relay subscription to remote server.
-     * @param host  Remote server.
-     * @param subscribeMessage  The message client sent.(Should be forwarded)
-     */
-
-    public void doSingleSubscriberRelay(Host host, SubscribeMessage subscribeMessage){
-        try{
-
-            Socket socket = new Socket(host.getHostname(), host.getPort());
-            socket.setSoTimeout(3000);
-            Server.logger.log(Level.FINE, "subscribing to {0}", socket.getRemoteSocketAddress().toString());
-
-            DataInputStream inputStream = new DataInputStream(socket.getInputStream());
-            DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
-
-            SubscribeMessage relay_message = new SubscribeMessage(false,subscribeMessage.getId(),subscribeMessage.getResourceTemplate());
-
-            String JSON = gson.toJson(relay_message);
-
-            outputStream.writeUTF(JSON);
-            outputStream.flush();
-
-            String response = inputStream.readUTF();
-
-            if(response.contains("success")){
-                Server.logger.log(Level.FINE, "{0} successful relayed", host.toString());
-                this.relay.put(socket,new Subscription(relay_message,this.ClientAddress, host));
-            }else {
-                Server.logger.log(Level.WARNING, "{0} failed when relaying", host.toString());
-            }
-
-
-        } catch (SocketTimeoutException e) {
-            Server.logger.log(Level.WARNING, "{0} timeout when subscribe relay", host.toString());
-            this.serverList.removeServer(host);
-        } catch (ConnectException e) {
-            Server.logger.log(Level.WARNING, "{0} timeout when create subscribe socket", host.toString());
-            this.serverList.removeServer(host);
-        } catch (IOException e) {
-            Server.logger.log(Level.WARNING, "{0} IOException when subscribe relay", host.toString());
-            this.serverList.removeServer(host);
-        }
-
-
-
-    }
-
-    /**
-     * Handle close up message.
-     * @param socket Socket to close.
-     * @param subscription  Description of this socket.
-     */
-    public void closeSubscription(Socket socket,Subscription subscription){
-        Host host = subscription.getTarget();
-        int resultsize = 0;
-        try{
-            socket.setSoTimeout(3000);
-            DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
-            DataInputStream inputStream = new DataInputStream(socket.getInputStream());
-
-            Server.logger.log(Level.FINE, "{0} : terminating subscribe relay {0}", socket.getRemoteSocketAddress().toString());
-
-            UnsubscribeMessage unsubscribeMessage = new UnsubscribeMessage(subscription.getSubscribeMessage().getId());
-            String JSON = gson.toJson(unsubscribeMessage);
-
-            outputStream.writeUTF(JSON);
-            outputStream.flush();
-
-            String response = inputStream.readUTF();
-
-            if(!response.contains("resultSize")){
-                socket.close();
-                throw new IOException();
-            }
-
-            socket.close();
-
-        }catch (SocketTimeoutException e) {
-            Server.logger.log(Level.WARNING, "{0} timeout when subscribe relay", host.toString());
-            this.serverList.removeServer(host);
-        } catch (ConnectException e) {
-            Server.logger.log(Level.WARNING, "{0} timeout when create subscribe socket", host.toString());
-            this.serverList.removeServer(host);
-        } catch (IOException e) {
-            Server.logger.log(Level.WARNING, "{0} IOException when subscribe relay", host.toString());
-            this.serverList.removeServer(host);
-        }
-
-    }
-
-    /**
      * Examine input is available without blocking(If java.nio not applicable.)
      * @return  Whether there is data available.
      */
@@ -655,13 +563,13 @@ public class WorkerThread extends Thread {
 
         } catch (SocketTimeoutException e) {
             Server.logger.log(Level.WARNING, "{0} timeout when query relay", host.toString());
-            this.serverList.removeServer(host);
+            this.serverList.removeServer(host,secure);
         } catch (ConnectException e) {
             Server.logger.log(Level.WARNING, "{0} timeout when create relay socket", host.toString());
-            this.serverList.removeServer(host);
+            this.serverList.removeServer(host,secure);
         } catch (IOException e) {
             Server.logger.log(Level.WARNING, "{0} IOException when query relay", host.toString());
-            this.serverList.removeServer(host);
+            this.serverList.removeServer(host,secure);
         }
         return result;
     }

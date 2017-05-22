@@ -1,16 +1,23 @@
 package EZShare;
 
 import EZShare.log.LogCustomFormatter;
+import EZShare.message.Host;
 import EZShare.message.SubscribeMessage;
+import EZShare.message.UnsubscribeMessage;
 import EZShare.server.FileList;
 import EZShare.server.ServerList;
 import EZShare.server.Subscription;
 import EZShare.server.WorkerThread;
+import com.google.gson.Gson;
 import org.apache.commons.cli.*;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
+import java.net.ConnectException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -40,7 +47,8 @@ public class Server {
     
     private static final FileList fileList = new FileList();
     private static final ServerList serverList = new ServerList();
-    
+
+    private static final Gson gson = new Gson();
     /*
         Currently it is a simple fixed-volume thread pool.
         If no thread resource is available at the moment, it would be blocked until it could get one.
@@ -88,6 +96,111 @@ public class Server {
         return buf.toString();
     }
 
+    /**
+     * Make a single relay subscription to remote server.
+     * @param host  Remote server.
+     * @param subscribeMessage  The message client sent.(Should be forwarded)
+     */
+
+    public static void doSingleSubscriberRelay(String ClientAddress,Host host, SubscribeMessage subscribeMessage, boolean secure){
+        ConcurrentHashMap<Socket, Subscription> relay;
+        if (secure){
+            relay = secure_relay;
+        }else {
+            relay = unsecure_relay;
+        }
+
+        try{
+
+            Socket socket = new Socket(host.getHostname(), host.getPort());
+            socket.setSoTimeout(3000);
+            logger.log(Level.FINE, "subscribing to {0}", socket.getRemoteSocketAddress().toString());
+
+            DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+            DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
+
+            SubscribeMessage relay_message = new SubscribeMessage(false,subscribeMessage.getId(),subscribeMessage.getResourceTemplate());
+
+            String JSON = gson.toJson(relay_message);
+
+            outputStream.writeUTF(JSON);
+            outputStream.flush();
+
+            String response = inputStream.readUTF();
+
+            if(response.contains("success")){
+                logger.log(Level.FINE, "{0} successful relayed", host.toString());
+                relay.put(socket,new Subscription(relay_message,ClientAddress, host));
+            }else {
+                logger.log(Level.WARNING, "{0} failed when relaying", host.toString());
+            }
+
+
+        } catch (SocketTimeoutException e) {
+            logger.log(Level.WARNING, "{0} timeout when subscribe relay", host.toString());
+            serverList.removeServer(host,secure);
+        } catch (ConnectException e) {
+            logger.log(Level.WARNING, "{0} timeout when create subscribe socket", host.toString());
+            serverList.removeServer(host,secure);
+        } catch (IOException e) {
+            logger.log(Level.WARNING, "{0} IOException when subscribe relay", host.toString());
+            serverList.removeServer(host,secure);
+        }
+
+
+
+    }
+
+    /**
+     * Handle close up message.
+     * @param socket Socket to close.
+     * @param subscription  Description of this socket.
+     */
+    public static void closeSubscription(Socket socket,Subscription subscription,boolean secure){
+        Host host = subscription.getTarget();
+        ConcurrentHashMap<Socket, Subscription> relay;
+        if (secure){
+            relay = secure_relay;
+        }else {
+            relay = unsecure_relay;
+        }
+        try{
+            socket.setSoTimeout(3000);
+            DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
+            DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+
+            logger.log(Level.FINE, "{0} : terminating subscribe relay {0}", socket.getRemoteSocketAddress().toString());
+
+            UnsubscribeMessage unsubscribeMessage = new UnsubscribeMessage(subscription.getSubscribeMessage().getId());
+            String JSON = gson.toJson(unsubscribeMessage);
+
+            outputStream.writeUTF(JSON);
+            outputStream.flush();
+
+            String response = inputStream.readUTF();
+
+            if(!response.contains("resultSize")){
+                socket.close();
+                throw new IOException();
+            }
+
+            socket.close();
+
+        }catch (SocketTimeoutException e) {
+            logger.log(Level.WARNING, "{0} timeout when subscribe relay", host.toString());
+            serverList.removeServer(host,secure);
+        } catch (ConnectException e) {
+            logger.log(Level.WARNING, "{0} timeout when create subscribe socket", host.toString());
+            serverList.removeServer(host,secure);
+        } catch (IOException e) {
+            logger.log(Level.WARNING, "{0} IOException when subscribe relay", host.toString());
+            serverList.removeServer(host,secure);
+        }  finally {
+            relay.remove(socket);
+        }
+
+    }
+
     public static void main(String[] args) {
         logger.info("Starting the EZShare Server");
         /* Timer running as a daemon thread schedules the regular EXCHANGE command. */
@@ -95,11 +208,18 @@ public class Server {
         TimerTask regularExchangeTask = new TimerTask() {   
             @Override
             public void run() {
-                serverList.regularExchange();
+                serverList.regularExchange(true);
             }   
-        };   
+        };
+        TimerTask secure_regularExchangeTask = new TimerTask() {
+            @Override
+            public void run() {
+                serverList.regularExchange(false);
+            }
+        };
         timer.schedule(regularExchangeTask, 0, EXCHANGE_PERIOD);
-        
+        timer.schedule(secure_regularExchangeTask, 1000, EXCHANGE_PERIOD);
+
         /* Receive requests. */
         ServerSocketFactory factory = ServerSocketFactory.getDefault();
 
