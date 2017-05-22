@@ -80,6 +80,7 @@ public class Server {
         options.addOption("port", true, "server port, an integer");
         options.addOption("secret", true, "secret");
         options.addOption("debug", false, "print debug information");
+        options.addOption("sport", true, "server secure port, an integer");
 
         //parse command line arguments
         return options;
@@ -208,13 +209,13 @@ public class Server {
         TimerTask regularExchangeTask = new TimerTask() {   
             @Override
             public void run() {
-                serverList.regularExchange(true);
+                serverList.regularExchange(false);
             }   
         };
         TimerTask secure_regularExchangeTask = new TimerTask() {
             @Override
             public void run() {
-                serverList.regularExchange(false);
+                serverList.regularExchange(true);
             }
         };
         timer.schedule(regularExchangeTask, 0, EXCHANGE_PERIOD);
@@ -245,6 +246,11 @@ public class Server {
             if(line.hasOption("port")){
                 PORT = Integer.parseInt(line.getOptionValue("port"));
             }
+
+            if(line.hasOption("sport")){
+                SPORT = Integer.parseInt(line.getOptionValue("sport"));
+            }
+
             if(line.hasOption("secret")){
                 SECRET = line.getOptionValue("secret");
 
