@@ -3,7 +3,6 @@ package EZShare.server;
 import EZShare.Server;
 import EZShare.message.ExchangeMessage;
 import EZShare.message.Host;
-import EZShare.message.SubscribeMessage;
 import com.google.gson.Gson;
 
 import javax.net.ssl.SSLSocket;
@@ -29,7 +28,6 @@ import java.util.concurrent.ThreadLocalRandom;
 public class ServerList {
     public static final int SERVER_TIMEOUT = (int) Server.EXCHANGE_PERIOD / 2;
     
-    /* TO-DO: What if serverList contains itself? */
     private final List<Host> serverList = new ArrayList<>();
     private final List<Host> secure_serverList = new ArrayList<>();
     
@@ -69,7 +67,7 @@ public class ServerList {
 
                 //for each subscription connection.
                 for (Map.Entry<Socket, Subscription> s: Server.subscriptions.entrySet()) {
-                    String orgin = s.getValue().getOrgin();
+                    String orgin = s.getValue().getOrigin();
                     boolean isrelay = s.getValue().getSubscribeMessage().isRelay();
                     boolean issecure = s.getKey().getClass().equals(SSLSocket.class);
                     //check whether this client need to be relayed for this exchange.

@@ -1,18 +1,7 @@
 package EZShare.server;
 
-import EZShare.Server;
 import EZShare.message.Host;
 import EZShare.message.SubscribeMessage;
-import EZShare.message.UnsubscribeMessage;
-import com.google.gson.Gson;
-
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.net.ConnectException;
-import java.net.Socket;
-import java.net.SocketTimeoutException;
-import java.util.logging.Level;
 
 /**
  * Encapsulation of subscriptions
@@ -20,47 +9,46 @@ import java.util.logging.Level;
  * @author zenanz
  */
 public class Subscription {
-    private int reusltsize = 0;
+    private int resultSize = 0;
     private SubscribeMessage subscribeMessage;
-    private String orgin;
+    private String origin;
     private Host target;
 
-    public Subscription(SubscribeMessage subscribeMessage,String orgin, Host target){
-        this.orgin = orgin;
+    public Subscription(SubscribeMessage subscribeMessage, String origin, Host target) {
+        this.origin = origin;
         this.target = target;
         this.subscribeMessage = subscribeMessage;
     }
 
-    public Subscription(SubscribeMessage subscribeMessage,String orgin){
-        this.orgin = orgin;
+    public Subscription(SubscribeMessage subscribeMessage, String origin) {
+        this.origin = origin;
         this.subscribeMessage = subscribeMessage;
     }
 
 
-
-    public SubscribeMessage getSubscribeMessage(){
+    public SubscribeMessage getSubscribeMessage() {
         return this.subscribeMessage;
     }
 
     @Override
     public String toString() {
-        return this.subscribeMessage.getId()+"|currentsize:"+reusltsize;
+        return this.subscribeMessage.getId() + "|currentSize:" + resultSize;
     }
 
-    public int getReusltsize(){
-        return reusltsize;
+    public int getResultSize() {
+        return resultSize;
     }
 
-    public void addResult(int number){
-        this.reusltsize+=number;
+    public void addResult(int number) {
+        this.resultSize += number;
     }
 
     public Host getTarget() {
         return target;
     }
 
-    public String getOrgin() {
-        return orgin;
+    public String getOrigin() {
+        return origin;
     }
 
 }

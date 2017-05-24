@@ -2,15 +2,16 @@ package EZShare.message;
 
 /**
  * Encapsulation of subscribe message
+ *
  * @author jason
  */
-public class SubscribeMessage extends Message{
+public class SubscribeMessage extends Message {
 
     private boolean relay;
     private String id;
     private ResourceTemplate resourceTemplate;
 
-    public SubscribeMessage(boolean relay, String id, ResourceTemplate resourceTemplate){
+    public SubscribeMessage(boolean relay, String id, ResourceTemplate resourceTemplate) {
         super("SUBSCRIBE");
         this.relay = relay;
         this.id = id;
@@ -31,6 +32,6 @@ public class SubscribeMessage extends Message{
 
     @Override
     public boolean isValid() {
-        return resourceTemplate.isValid()&&id!=null;
+        return resourceTemplate.isValid() && id != null;
     }
 }

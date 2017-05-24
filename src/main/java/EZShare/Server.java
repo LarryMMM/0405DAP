@@ -29,47 +29,47 @@ import java.util.logging.Logger;
 import javax.net.ServerSocketFactory;
 
 /**
- *
  * @author Wenhao Zhao, Ying Li
  */
 public class Server {
 
-    /* Configuration */
+    /* Default configuration */
     public static String HOST = "localhost";
     public static int PORT = 3780;
     public static int SPORT = 3781;
-    public static final int MAX_THREAD_COUNT = 10;
+    public static final int MAX_THREAD_COUNT = 50;
     public static long EXCHANGE_PERIOD = 600000;
     public static long INTERVAL = 1000;
     public static String SECRET = random(26);
-    
+
+    /* Data structures and utilities */
     public static final Logger logger = LogCustomFormatter.getLogger(Server.class.getName());
-    
     private static final FileList fileList = new FileList();
     private static final ServerList serverList = new ServerList();
-
     private static final Gson gson = new Gson();
+
     /*
         Currently it is a simple fixed-volume thread pool.
         If no thread resource is available at the moment, it would be blocked until it could get one.
     */
     private static ExecutorService threadPool = Executors.newFixedThreadPool(MAX_THREAD_COUNT);
-    
+
     /*
         A HashMap to record the mapping from a specified client to the starting time of its last connection
     */
     private static ConcurrentHashMap<String, Long> intervalLimit = new ConcurrentHashMap<>();
 
-    public static ConcurrentHashMap<Socket,Subscription> subscriptions = new ConcurrentHashMap<>();
-
-    public static ConcurrentHashMap<Socket,Subscription> secure_relay = new ConcurrentHashMap<>();
-
-    public static ConcurrentHashMap<Socket,Subscription> unsecure_relay = new ConcurrentHashMap<>();
+    /*
+        Data structures for subscriptions and relayed subscriptions
+    */
+    public static ConcurrentHashMap<Socket, Subscription> subscriptions = new ConcurrentHashMap<>();
+    public static ConcurrentHashMap<Socket, Subscription> secure_relay = new ConcurrentHashMap<>();
+    public static ConcurrentHashMap<Socket, Subscription> unsecure_relay = new ConcurrentHashMap<>();
 
     /**
      * Construct command line options
-     * @return  CommandLine options.
      *
+     * @return CommandLine options.
      */
     private static Options commandOptions() {
         //Build up command line options
@@ -86,7 +86,7 @@ public class Server {
         return options;
     }
 
-    public static String random(int length) {
+    private static String random(int length) {
         String str = "abcdefghijklmnopqrstuvwxyz0123456789";
         Random random = new Random();
         StringBuilder buf = new StringBuilder();
@@ -99,17 +99,21 @@ public class Server {
 
     /**
      * Make a single relay subscription to remote server.
-     * @param host  Remote server.
-     * @param subscribeMessage  The message client sent.(Should be forwarded)
+     *
+     * @param host             Remote server.
+     * @param subscribeMessage The message client sent.(Should be forwarded)
      */
 
-    public static void doSingleSubscriberRelay(String ClientAddress,Host host, SubscribeMessage subscribeMessage, boolean secure){
+    public static void doSingleSubscriberRelay(String ClientAddress, Host host, SubscribeMessage subscribeMessage, boolean secure) {
         ConcurrentHashMap<Socket, Subscription> relay;
         //indicate which set of hosts to relay to.
-        if (secure){relay = secure_relay;
-        }else {relay = unsecure_relay;}
+        if (secure) {
+            relay = secure_relay;
+        } else {
+            relay = unsecure_relay;
+        }
 
-        try{
+        try {
             //!!! Need SSL.
             Socket socket = new Socket(host.getHostname(), host.getPort());
 
@@ -119,7 +123,7 @@ public class Server {
             DataInputStream inputStream = new DataInputStream(socket.getInputStream());
             DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
 
-            SubscribeMessage relay_message = new SubscribeMessage(false,subscribeMessage.getId(),subscribeMessage.getResourceTemplate());
+            SubscribeMessage relay_message = new SubscribeMessage(false, subscribeMessage.getId(), subscribeMessage.getResourceTemplate());
 
             String JSON = gson.toJson(relay_message);
 
@@ -128,42 +132,45 @@ public class Server {
 
             String response = inputStream.readUTF();
 
-            if(response.contains("success")){
+            if (response.contains("success")) {
                 logger.log(Level.FINE, "{0} successful relayed", host.toString());
-                relay.put(socket,new Subscription(relay_message,ClientAddress, host));
-            }else {
+                relay.put(socket, new Subscription(relay_message, ClientAddress, host));
+            } else {
                 logger.log(Level.WARNING, "{0} failed when relaying", host.toString());
             }
 
 
         } catch (SocketTimeoutException e) {
             logger.log(Level.WARNING, "{0} timeout when subscribe relay", host.toString());
-            serverList.removeServer(host,secure);
+            serverList.removeServer(host, secure);
         } catch (ConnectException e) {
             logger.log(Level.WARNING, "{0} timeout when create subscribe socket", host.toString());
-            serverList.removeServer(host,secure);
+            serverList.removeServer(host, secure);
         } catch (IOException e) {
             logger.log(Level.WARNING, "{0} IOException when subscribe relay", host.toString());
-            serverList.removeServer(host,secure);
+            serverList.removeServer(host, secure);
         }
-
 
 
     }
 
     /**
      * Handle close up message.
-     * @param socket Socket to close.
-     * @param subscription  Description of this socket.
+     *
+     * @param socket       Socket to close.
+     * @param subscription Description of this socket.
      */
-    public static void closeSubscription(Socket socket,Subscription subscription,boolean secure){
+    public static void closeSubscription(Socket socket, Subscription subscription, boolean secure) {
         Host host = subscription.getTarget();
         ConcurrentHashMap<Socket, Subscription> relay;
-        //indicate which set of hosts to relay to.
-        if (secure){relay = secure_relay;}
-        else {relay = unsecure_relay;}
+        // indicate which set of hosts to relay to.
+        if (secure) {
+            relay = secure_relay;
+        } else {
+            relay = unsecure_relay;
+        }
 
-        try{
+        try {
             socket.setSoTimeout(3000);
             DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
             DataInputStream inputStream = new DataInputStream(socket.getInputStream());
@@ -178,23 +185,23 @@ public class Server {
 
             String response = inputStream.readUTF();
 
-            if(!response.contains("resultSize")){
+            if (!response.contains("resultSize")) {
                 socket.close();
                 throw new IOException();
             }
 
             socket.close();
 
-        }catch (SocketTimeoutException e) {
+        } catch (SocketTimeoutException e) {
             logger.log(Level.WARNING, "{0} timeout when subscribe relay", host.toString());
-            serverList.removeServer(host,secure);
+            serverList.removeServer(host, secure);
         } catch (ConnectException e) {
             logger.log(Level.WARNING, "{0} timeout when create subscribe socket", host.toString());
-            serverList.removeServer(host,secure);
+            serverList.removeServer(host, secure);
         } catch (IOException e) {
             logger.log(Level.WARNING, "{0} IOException when subscribe relay", host.toString());
-            serverList.removeServer(host,secure);
-        }  finally {
+            serverList.removeServer(host, secure);
+        } finally {
             relay.remove(socket);
         }
 
@@ -202,13 +209,14 @@ public class Server {
 
     public static void main(String[] args) {
         logger.info("Starting the EZShare Server");
+
         /* Timer running as a daemon thread schedules the regular EXCHANGE command. */
         Timer timer = new Timer(true);
-        TimerTask regularExchangeTask = new TimerTask() {   
+        TimerTask regularExchangeTask = new TimerTask() {
             @Override
             public void run() {
                 serverList.regularExchange(false);
-            }   
+            }
         };
         TimerTask secure_regularExchangeTask = new TimerTask() {
             @Override
@@ -219,64 +227,62 @@ public class Server {
         timer.schedule(regularExchangeTask, 0, EXCHANGE_PERIOD);
         timer.schedule(secure_regularExchangeTask, 1000, EXCHANGE_PERIOD);
 
-        /* Receive requests. */
-        ServerSocketFactory factory = ServerSocketFactory.getDefault();
-
+        /* Command line processing */
         CommandLineParser parser = new DefaultParser();
         Options options = commandOptions();
 
         try {
-            //parse command line arguments
-            CommandLine line = parser.parse(options,args);
+            // parse command line arguments
+            CommandLine line = parser.parse(options, args);
 
-            if(line.hasOption("advertisedhostname")){
+            if (line.hasOption("advertisedhostname")) {
                 HOST = line.getOptionValue("advertisedhostname");
 
             }
-            if(line.hasOption("connectionintervallimit")){
+            if (line.hasOption("connectionintervallimit")) {
                 INTERVAL = Integer.parseInt(line.getOptionValue("connectionintervallimit"));
 
             }
-            if(line.hasOption("exchangeinterval")){
+            if (line.hasOption("exchangeinterval")) {
                 EXCHANGE_PERIOD = Integer.parseInt(line.getOptionValue("exchangeinterval"));
 
             }
-            if(line.hasOption("port")){
+            if (line.hasOption("port")) {
                 PORT = Integer.parseInt(line.getOptionValue("port"));
             }
 
-            if(line.hasOption("sport")){
+            if (line.hasOption("sport")) {
                 SPORT = Integer.parseInt(line.getOptionValue("sport"));
             }
 
-            if(line.hasOption("secret")){
+            if (line.hasOption("secret")) {
                 SECRET = line.getOptionValue("secret");
 
             }
-            //if debug not toggle, cancel all logs.
-            if(!line.hasOption("debug")) {
-                logger.setFilter((LogRecord record)->(false));}
-            else {
+            // if debug not toggle, cancel all logs.
+            if (!line.hasOption("debug")) {
+                logger.setFilter((LogRecord record) -> (false));
+            } else {
                 logger.info("setting debug on");
             }
 
-            logger.info("using advertised hostname: "+HOST);
-            logger.info(String.valueOf("using connection interval limit: "+INTERVAL));
-            logger.info(String.valueOf("using exchange interval period: "+EXCHANGE_PERIOD));
-            logger.info("using secret: "+SECRET);
-            logger.info("bound to port "+PORT);
+            logger.info("Using advertised hostname: " + HOST);
+            logger.info(String.valueOf("Using connection interval limit: " + INTERVAL));
+            logger.info(String.valueOf("Using exchange interval period: " + EXCHANGE_PERIOD));
+            logger.info("Using secret: " + SECRET);
+            logger.info("Bound to port " + PORT);
             
-            /* Start listening */
+            /* Start listening and wait for connections. */
+            ServerSocketFactory factory = ServerSocketFactory.getDefault();
             ServerSocket server = factory.createServerSocket(PORT);
 
-            System.out.println("ServerSocket initialized.");
-            System.out.println("Waiting for client connection..");
-            logger.info("started");
+            logger.info("ServerSocket initialized.");
+            logger.info("Waiting for client connection..");
 
-            /* Wait for connections. */
             while (true) {
                 Socket client = server.accept();
 
+                /* Upper bound of simultaneous connections */
                 String clientIP = client.getInetAddress().getHostAddress();
                 long currentTime = System.currentTimeMillis();
                 if (!intervalLimit.containsKey(clientIP) || (currentTime - intervalLimit.get(clientIP) > INTERVAL)) {
@@ -286,7 +292,7 @@ public class Server {
                     /* Assign a worker thread for this socket. */
                     try {
                         threadPool.submit(new WorkerThread(client, fileList, serverList));
-                    } catch (IOException e){
+                    } catch (IOException e) {
                         logger.log(Level.WARNING, "{0} cannot create stream", client.getRemoteSocketAddress().toString());
                         client.close();
                     }
@@ -299,9 +305,9 @@ public class Server {
         } catch (IOException ex) {
             logger.warning(ex.getMessage());
         } catch (ParseException ex) {
-            //If commandline args invalid, show help info.
+            /* If commandline args are invalid, show help info. */
             HelpFormatter helpFormatter = new HelpFormatter();
-            helpFormatter.printHelp("EZShare.Server",options);
+            helpFormatter.printHelp("EZShare.Server", options);
         }
     }
 }

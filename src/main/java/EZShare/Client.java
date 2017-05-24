@@ -2,6 +2,7 @@ package EZShare;
 
 import EZShare.message.*;
 import EZShare.log.LogCustomFormatter;
+
 import java.io.*;
 
 import com.google.gson.Gson;
@@ -90,7 +91,7 @@ public class Client {
         if (line.hasOption("fetch")) {
             count++;
         }
-        if( line.hasOption("subscribe")){
+        if (line.hasOption("subscribe")) {
             count++;
         }
         return count == 1;
@@ -136,7 +137,7 @@ public class Client {
      * Send Messages to the server.
      *
      * @param output the output stream of the socket.
-     * @param JSON the json string to be sent.
+     * @param JSON   the json string to be sent.
      */
     private static void sendMessage(DataOutputStream output, String JSON) throws IOException {
         //send message to server
@@ -150,7 +151,7 @@ public class Client {
     /**
      * Process query command. Can also be utilized in Server WorkerThread
      *
-     * @param socket The socket connected to target server.
+     * @param socket           The socket connected to target server.
      * @param resourceTemplate The encapsulation of the resource.
      */
     public static void queryCommand(Socket socket, ResourceTemplate resourceTemplate) throws IOException {
@@ -193,7 +194,7 @@ public class Client {
     /**
      * Process publish command.
      *
-     * @param socket The socket connected to target server.
+     * @param socket           The socket connected to target server.
      * @param resourceTemplate The encapsulation of the resource.
      */
     private static void publishCommand(Socket socket, ResourceTemplate resourceTemplate) throws IOException {
@@ -223,8 +224,8 @@ public class Client {
     /**
      * Proceed share command
      *
-     * @param secret Secret of the server.
-     * @param socket The socket connected to target server.
+     * @param secret           Secret of the server.
+     * @param socket           The socket connected to target server.
      * @param resourceTemplate The encapsulation of the resource.
      */
     private static void shareCommand(Socket socket, String secret, ResourceTemplate resourceTemplate) throws IOException {
@@ -253,7 +254,7 @@ public class Client {
     /**
      * Process remove command.
      *
-     * @param socket The socket connected to target server.
+     * @param socket           The socket connected to target server.
      * @param resourceTemplate The encapsulation of the resource.
      */
     private static void removeCommand(Socket socket, ResourceTemplate resourceTemplate) throws IOException {
@@ -282,7 +283,7 @@ public class Client {
     /**
      * Process exchange command.
      *
-     * @param socket The socket connected to target server.
+     * @param socket     The socket connected to target server.
      * @param serverList The servers in exchange request.
      */
     private static void exchangeCommand(Socket socket, List<Host> serverList) throws IOException {
@@ -311,7 +312,7 @@ public class Client {
     /**
      * Process fetch command.
      *
-     * @param socket The socket connected to target server.
+     * @param socket           The socket connected to target server.
      * @param resourceTemplate The encapsulation of the resource.
      */
     private static void fetchCommand(Socket socket, ResourceTemplate resourceTemplate) throws IOException {
@@ -358,7 +359,7 @@ public class Client {
                 //set read buffer size
                 int buffer_size = 1024;
 
-                buffer_size = resource_size>buffer_size?buffer_size:resource_size;
+                buffer_size = resource_size > buffer_size ? buffer_size : resource_size;
 
                 byte[] buffer = new byte[buffer_size];
 
@@ -369,7 +370,7 @@ public class Client {
                 int received;
 
                 //read byte from socket until the last chunk
-                while(to_receive>buffer_size&&(received = input.read(buffer))!=-1){
+                while (to_receive > buffer_size && (received = input.read(buffer)) != -1) {
                     //write file
                     randomAccessFile.write(Arrays.copyOf(buffer, received));
                     //note down how many bytes received
@@ -380,7 +381,7 @@ public class Client {
 
                 }
 
-                if(to_receive>0) {
+                if (to_receive > 0) {
                     //set the buffer to the length of the last chunk
                     buffer = new byte[to_receive];
 
@@ -406,13 +407,13 @@ public class Client {
     /**
      * Process subscribe command.
      *
-     * @param socket The socket connected to target server.
+     * @param socket           The socket connected to target server.
      * @param resourceTemplate The query condition of subscribed resources.
-     * @param relay Whether the subscribe command will be relayed to other servers.
-     * @param id    The id of the subscription.
-     * @throws IOException  Exception in data stream.
+     * @param relay            Whether the subscribe command will be relayed to other servers.
+     * @param id               The id of the subscription.
+     * @throws IOException Exception in data stream.
      */
-    private static void subscribeCommand(Socket socket, ResourceTemplate resourceTemplate, boolean relay, String id) throws IOException{
+    private static void subscribeCommand(Socket socket, ResourceTemplate resourceTemplate, boolean relay, String id) throws IOException {
 
         DataInputStream input = new DataInputStream(socket.getInputStream());
         DataOutputStream output = new DataOutputStream(socket.getOutputStream());
@@ -420,7 +421,7 @@ public class Client {
         logger.fine("subscribing to " + socket.getRemoteSocketAddress());
 
         //construct subscribe message.
-        SubscribeMessage subscribeMessage = new SubscribeMessage(relay,id,resourceTemplate);
+        SubscribeMessage subscribeMessage = new SubscribeMessage(relay, id, resourceTemplate);
 
         String JSON = gson.toJson(subscribeMessage);
         sendMessage(output, JSON);
@@ -428,18 +429,18 @@ public class Client {
         String response = input.readUTF();
 
         //if successfully subscribed
-        if(response.contains("success")){
+        if (response.contains("success")) {
             logger.fine("RECEIVED:" + response);
 
             //hold connection until press enter.
             socket.setSoTimeout(1);
-            while (System.in.available()==0){
+            while (System.in.available() == 0) {
 
                 //check available resource and print out.
                 try {
                     String resource = input.readUTF();
                     System.out.println(resource);
-                }catch (IOException e){
+                } catch (IOException e) {
                     //just to prevent blocking in SSLSocket.
                 }
 
@@ -451,7 +452,7 @@ public class Client {
             UnsubscribeMessage unsubscribeMessage = new UnsubscribeMessage(id);
 
             JSON = gson.toJson(unsubscribeMessage);
-            sendMessage(output,JSON);
+            sendMessage(output, JSON);
 
             //read result size
             response = input.readUTF();
@@ -459,7 +460,7 @@ public class Client {
             logger.info("RECEIVED:" + response);
 
 
-        }else if(response.contains("error")){
+        } else if (response.contains("error")) {
             logger.warning("RECEIVED:" + response);
         }
 
@@ -555,11 +556,11 @@ public class Client {
                 }
             }
 
-            if (line.hasOption("subscribe")){
+            if (line.hasOption("subscribe")) {
                 boolean relay = line.hasOption("relay");
                 //set local IP address as default ID.
                 String id = line.getOptionValue("id", socket.getLocalAddress().toString());
-                subscribeCommand(socket,resourceTemplate,relay,id);
+                subscribeCommand(socket, resourceTemplate, relay, id);
             }
 
             if (error_message != null) {
