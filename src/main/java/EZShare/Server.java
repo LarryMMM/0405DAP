@@ -105,15 +105,14 @@ public class Server {
 
     public static void doSingleSubscriberRelay(String ClientAddress,Host host, SubscribeMessage subscribeMessage, boolean secure){
         ConcurrentHashMap<Socket, Subscription> relay;
-        if (secure){
-            relay = secure_relay;
-        }else {
-            relay = unsecure_relay;
-        }
+        //indicate which set of hosts to relay to.
+        if (secure){relay = secure_relay;
+        }else {relay = unsecure_relay;}
 
         try{
-
+            //!!! Need SSL.
             Socket socket = new Socket(host.getHostname(), host.getPort());
+
             socket.setSoTimeout(3000);
             logger.log(Level.FINE, "subscribing to {0}", socket.getRemoteSocketAddress().toString());
 
@@ -160,11 +159,10 @@ public class Server {
     public static void closeSubscription(Socket socket,Subscription subscription,boolean secure){
         Host host = subscription.getTarget();
         ConcurrentHashMap<Socket, Subscription> relay;
-        if (secure){
-            relay = secure_relay;
-        }else {
-            relay = unsecure_relay;
-        }
+        //indicate which set of hosts to relay to.
+        if (secure){relay = secure_relay;}
+        else {relay = unsecure_relay;}
+
         try{
             socket.setSoTimeout(3000);
             DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());

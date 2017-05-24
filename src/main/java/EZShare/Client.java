@@ -472,6 +472,7 @@ public class Client {
         CommandLineParser parser = new DefaultParser();
         Options options = commandOptions();
 
+        //!!!!Need SSL
         Socket socket = new Socket();
 
         try {

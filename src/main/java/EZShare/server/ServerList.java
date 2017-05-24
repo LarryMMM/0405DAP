@@ -72,7 +72,7 @@ public class ServerList {
                     String orgin = s.getValue().getOrgin();
                     boolean isrelay = s.getValue().getSubscribeMessage().isRelay();
                     boolean issecure = s.getKey().getClass().equals(SSLSocket.class);
-                    //check whether this client need to be relayed for this host.
+                    //check whether this client need to be relayed for this exchange.
                     if(isrelay&&(issecure==secure)){
                         //relay to this server for the client
                         Server.doSingleSubscriberRelay(orgin,inputHost,s.getValue().getSubscribeMessage(),secure);
@@ -100,6 +100,9 @@ public class ServerList {
             Socket socket = new Socket();
             
             try {
+
+            //!!!!!!Need SSL!
+
                 /* Set timeout for connection establishment, throwing ConnectException */
                 socket.connect(new InetSocketAddress(randomHost.getHostname(), randomHost.getPort()), SERVER_TIMEOUT);
                 /* Set timeout for read() (also readUTF()!), throwing SocketTimeoutException */
@@ -111,7 +114,7 @@ public class ServerList {
                 Server.logger.fine("Regular EXCHANGE to " + socket.getRemoteSocketAddress());
                 
                 ExchangeMessage exchangeMessage = new ExchangeMessage(serverList);
-                
+
                 String JSON = new Gson().toJson(exchangeMessage);
                 output.writeUTF(JSON);
                 output.flush();

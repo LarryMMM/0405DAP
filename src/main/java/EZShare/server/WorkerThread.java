@@ -533,6 +533,7 @@ public class WorkerThread extends Thread {
 
         List<ResourceTemplate> result = new ArrayList<>();
 
+        //!!! Need SSL.
         try (Socket socket = new Socket(host.getHostname(), host.getPort())) {
 
             Server.logger.log(Level.FINE, "querying to {0}", socket.getRemoteSocketAddress().toString());
