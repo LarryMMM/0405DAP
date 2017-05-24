@@ -13,11 +13,11 @@ import org.apache.commons.cli.*;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.net.ConnectException;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.SocketTimeoutException;
+import java.net.*;
+import java.security.*;
+import java.security.cert.CertificateException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -27,6 +27,7 @@ import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import javax.net.ServerSocketFactory;
+import javax.net.ssl.*;
 
 /**
  * @author Wenhao Zhao, Ying Li
@@ -43,6 +44,7 @@ public class Server {
     public static String SECRET = random(26);
 
     /* Data structures and utilities */
+    public static SSLContext context = null;
     public static final Logger logger = LogCustomFormatter.getLogger(Server.class.getName());
     private static final FileList fileList = new FileList();
     private static final ServerList serverList = new ServerList();
@@ -113,9 +115,16 @@ public class Server {
             relay = unsecure_relay;
         }
 
+        Socket socket = null;
         try {
-            //!!! Need SSL.
-            Socket socket = new Socket(host.getHostname(), host.getPort());
+            // Need SSL!!!
+            if (secure) {
+                socket = Server.context.getSocketFactory().createSocket();
+            } else {
+                socket = new Socket();
+            }
+            socket.connect(new InetSocketAddress(host.getHostname(), host.getPort()));
+
 
             socket.setSoTimeout(3000);
             logger.log(Level.FINE, "subscribing to {0}", socket.getRemoteSocketAddress().toString());
@@ -149,6 +158,13 @@ public class Server {
         } catch (IOException e) {
             logger.log(Level.WARNING, "{0} IOException when subscribe relay", host.toString());
             serverList.removeServer(host, secure);
+        } finally {
+            try {
+                if (socket != null)
+                    socket.close();
+            } catch (IOException e) {
+                logger.warning("IOException! Disconnect!");
+            }
         }
 
 
@@ -237,77 +253,163 @@ public class Server {
 
             if (line.hasOption("advertisedhostname")) {
                 HOST = line.getOptionValue("advertisedhostname");
-
             }
             if (line.hasOption("connectionintervallimit")) {
                 INTERVAL = Integer.parseInt(line.getOptionValue("connectionintervallimit"));
-
             }
             if (line.hasOption("exchangeinterval")) {
                 EXCHANGE_PERIOD = Integer.parseInt(line.getOptionValue("exchangeinterval"));
-
             }
             if (line.hasOption("port")) {
                 PORT = Integer.parseInt(line.getOptionValue("port"));
             }
-
             if (line.hasOption("sport")) {
                 SPORT = Integer.parseInt(line.getOptionValue("sport"));
             }
 
             if (line.hasOption("secret")) {
                 SECRET = line.getOptionValue("secret");
-
             }
             // if debug not toggle, cancel all logs.
+            /*
             if (!line.hasOption("debug")) {
                 logger.setFilter((LogRecord record) -> (false));
             } else {
                 logger.info("setting debug on");
             }
+            */
 
             logger.info("Using advertised hostname: " + HOST);
             logger.info(String.valueOf("Using connection interval limit: " + INTERVAL));
             logger.info(String.valueOf("Using exchange interval period: " + EXCHANGE_PERIOD));
             logger.info("Using secret: " + SECRET);
-            logger.info("Bound to port " + PORT);
-            
-            /* Start listening and wait for connections. */
-            ServerSocketFactory factory = ServerSocketFactory.getDefault();
-            ServerSocket server = factory.createServerSocket(PORT);
 
+
+
+
+
+            /* SSL Context! */
+            String keystorePath = "keystore/server.keystore";
+            String trustKeystorePath = "keystore/trust-ca.keystore";
+            String keystorePassword = "123456";
+            Server.context = SSLContext.getInstance("SSL");
+
+            KeyStore keystore = KeyStore.getInstance("pkcs12");
+            FileInputStream keystoreFis = new FileInputStream(keystorePath);
+            keystore.load(keystoreFis, keystorePassword.toCharArray());
+
+            KeyStore trustKeystore = KeyStore.getInstance("jks");
+            FileInputStream trustKeystoreFis = new FileInputStream(trustKeystorePath);
+            trustKeystore.load(trustKeystoreFis, keystorePassword.toCharArray());
+
+            KeyManagerFactory kmf = KeyManagerFactory.getInstance("sunx509");
+            kmf.init(keystore, keystorePassword.toCharArray());
+
+            TrustManagerFactory tmf = TrustManagerFactory.getInstance("sunx509");
+            tmf.init(trustKeystore);
+
+            Server.context.init(kmf.getKeyManagers(), tmf.getTrustManagers(), null);
+
+
+            logger.info("Bound to port " + PORT);
+            logger.info("Bound to sport " + SPORT);
+            
+            /* Create ServerSocket */
+            ServerSocketFactory factory = ServerSocketFactory.getDefault();
+            ServerSocket serverSocket = factory.createServerSocket(PORT);
             logger.info("ServerSocket initialized.");
+
+            /* Create SSLServerSocket */
+            SSLServerSocket sslServerSocket = (SSLServerSocket) Server.context.getServerSocketFactory().createServerSocket(SPORT);
+            sslServerSocket.setNeedClientAuth(true);
+            logger.info("SSLServerSocket initialized.");
+
+
             logger.info("Waiting for client connection..");
 
-            while (true) {
-                Socket client = server.accept();
 
-                /* Upper bound of simultaneous connections */
-                String clientIP = client.getInetAddress().getHostAddress();
-                long currentTime = System.currentTimeMillis();
-                if (!intervalLimit.containsKey(clientIP) || (currentTime - intervalLimit.get(clientIP) > INTERVAL)) {
-                    /* Update the time record */
-                    intervalLimit.put(clientIP, currentTime);
-                    
-                    /* Assign a worker thread for this socket. */
+            /* Start listening */
+            Thread plainSocket = new Thread(() -> {
+                while (true) {
                     try {
-                        threadPool.submit(new WorkerThread(client, fileList, serverList));
-                    } catch (IOException e) {
-                        logger.log(Level.WARNING, "{0} cannot create stream", client.getRemoteSocketAddress().toString());
-                        client.close();
-                    }
+                        Socket client = serverSocket.accept();
 
-                } else {
+                        /* Upper bound of simultaneous connections */
+                        String clientIP = client.getInetAddress().getHostAddress();
+                        long currentTime = System.currentTimeMillis();
+                        if (!intervalLimit.containsKey(clientIP) || (currentTime - intervalLimit.get(clientIP) > INTERVAL)) {
+                            /* Update the time record */
+                            intervalLimit.put(clientIP, currentTime);
+
+                            /* Assign a worker thread for this socket. */
+                            try {
+                                Server.threadPool.submit(new WorkerThread(client, fileList, serverList));
+                            } catch (IOException e) {
+                                logger.log(Level.WARNING, "{0} cannot create stream", client.getRemoteSocketAddress().toString());
+                                client.close();
+                            }
+
+                        } else {
                     /* Violation */
-                    client.close();
+                            client.close();
+                        }
+                    } catch (IOException ex) {
+                        logger.warning(ex.getMessage());
+                    }
                 }
-            }
+            });
+
+            Thread sslSocket = new Thread(() -> {
+                while (true) {
+                    try {
+                        Socket client = sslServerSocket.accept();
+
+                        /* Upper bound of simultaneous connections */
+                        String clientIP = client.getInetAddress().getHostAddress();
+                        long currentTime = System.currentTimeMillis();
+                        if (!intervalLimit.containsKey(clientIP) || (currentTime - intervalLimit.get(clientIP) > INTERVAL)) {
+                            /* Update the time record */
+                            intervalLimit.put(clientIP, currentTime);
+
+                            /* Assign a worker thread for this socket. */
+                            try {
+                                Server.threadPool.submit(new WorkerThread(client, fileList, serverList));
+                            } catch (IOException e) {
+                                logger.log(Level.WARNING, "{0} cannot create stream", client.getRemoteSocketAddress().toString());
+                                client.close();
+                            }
+
+                        } else {
+                    /* Violation */
+                            client.close();
+                        }
+                    } catch (IOException ex) {
+                        logger.warning(ex.getMessage());
+                    }
+                }
+            });
+
+            plainSocket.start();
+            sslSocket.start();
+
         } catch (IOException ex) {
             logger.warning(ex.getMessage());
         } catch (ParseException ex) {
             /* If commandline args are invalid, show help info. */
             HelpFormatter helpFormatter = new HelpFormatter();
             helpFormatter.printHelp("EZShare.Server", options);
+        }
+        // SSL issues
+        catch (CertificateException e) {
+            e.printStackTrace();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (UnrecoverableKeyException e) {
+            e.printStackTrace();
+        } catch (KeyStoreException e) {
+            e.printStackTrace();
+        } catch (KeyManagementException e) {
+            e.printStackTrace();
         }
     }
 }

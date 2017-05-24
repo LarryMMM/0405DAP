@@ -8,10 +8,16 @@ import java.io.*;
 import com.google.gson.Gson;
 import org.apache.commons.cli.*;
 
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.TrustManagerFactory;
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
+import java.security.*;
+import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -26,7 +32,7 @@ public class Client {
     private static final String download_path = "Downloads/";
     private static final Logger logger = LogCustomFormatter.getLogger(Client.class.getName());
     private static final Gson gson = new Gson();
-    private static final int TIME_OUT = 3000;
+    private static final int TIME_OUT = 30000;
 
     /**
      * Construct command line options
@@ -40,7 +46,7 @@ public class Client {
         options.addOption("id", true, "set the ID for subscribe request");
         options.addOption("subscribe", false, "subscribe resource from server");
         options.addOption("secure", false, "set true to initiate secure connection");
-        options.addOption("sport", true, "server secure port, an integer");
+        // options.addOption("sport", true, "server secure port, an integer");
         options.addOption("debug", false, "print debug information");
         options.addOption("fetch", false, "fetch resource from server");
         options.addOption("channel", true, "channel");
@@ -468,13 +474,11 @@ public class Client {
     }
 
     public static void main(String[] args) {
-
         //Initialize command line parser and options
         CommandLineParser parser = new DefaultParser();
         Options options = commandOptions();
 
-        //!!!!Need SSL
-        Socket socket = new Socket();
+        Socket socket = null;
 
         try {
             //parse command line arguments
@@ -486,11 +490,13 @@ public class Client {
             }
 
             //set debug on if toggled
+            /*
             if (!line.hasOption("debug")) {
                 logger.setFilter((LogRecord record) -> (false));
             } else {
                 logger.info("setting debug on");
             }
+            */
 
             //get destination host from commandline args
             Host host = getHost(line);
@@ -498,7 +504,36 @@ public class Client {
             //get resource template from command args
             ResourceTemplate resourceTemplate = getResourceTemplate(line);
 
-            //connect to server
+
+            // SSLSocket? Or plain Socket?
+            if (line.hasOption("secure")) {
+                String keystorePath = "keystore/client.keystore";
+                String trustKeystorePath = "keystore/trust-ca.keystore";
+                String keystorePassword = "123456";
+                SSLContext context = SSLContext.getInstance("SSL");
+
+                KeyStore clientKeystore = KeyStore.getInstance("pkcs12");
+                FileInputStream keystoreFis = new FileInputStream(keystorePath);
+                clientKeystore.load(keystoreFis, keystorePassword.toCharArray());
+
+                KeyStore trustKeystore = KeyStore.getInstance("jks");
+                FileInputStream trustKeystoreFis = new FileInputStream(trustKeystorePath);
+                trustKeystore.load(trustKeystoreFis, keystorePassword.toCharArray());
+
+                KeyManagerFactory kmf = KeyManagerFactory.getInstance("sunx509");
+                kmf.init(clientKeystore, keystorePassword.toCharArray());
+
+                TrustManagerFactory tmf = TrustManagerFactory.getInstance("sunx509");
+                tmf.init(trustKeystore);
+
+                context.init(kmf.getKeyManagers(), tmf.getTrustManagers(), null);
+
+                socket = context.getSocketFactory().createSocket();
+            } else {
+                socket = new Socket();
+            }
+
+            /* Connect! */
             socket.connect(new InetSocketAddress(host.getHostname(), host.getPort()), TIME_OUT);
 
             //proceed commands
@@ -573,17 +608,30 @@ public class Client {
             helpFormatter.printHelp("EZShare.Client", options);
         } catch (ConnectException e) {
             logger.warning("Socket connection timeout!");
+            e.printStackTrace();
         } catch (ArrayIndexOutOfBoundsException | NumberFormatException e) {
             //when value of -servers option invalid
             logger.warning("Server address invalid.");
         } catch (SocketTimeoutException e) {
             logger.warning("Socket timeout!");
-
         } catch (IOException e) {
             logger.warning("IOException!");
+        }
+        // SSL issues
+        catch (CertificateException e) {
+            e.printStackTrace();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (UnrecoverableKeyException e) {
+            e.printStackTrace();
+        } catch (KeyStoreException e) {
+            e.printStackTrace();
+        } catch (KeyManagementException e) {
+            e.printStackTrace();
         } finally {
             try {
-                socket.close();
+                if (socket != null)
+                    socket.close();
             } catch (IOException e) {
                 logger.warning("IOException! Disconnect!");
             }

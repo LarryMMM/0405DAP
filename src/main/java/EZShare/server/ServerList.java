@@ -95,14 +95,19 @@ public class ServerList {
             int randomIndex = ThreadLocalRandom.current().nextInt(0, serverList.size());
             Host randomHost = serverList.get(randomIndex);
             
-            Socket socket = new Socket();
+            Socket socket = null;
             
             try {
-
-            //!!!!!!Need SSL!
-
+                // Need SSL!!!
+                if (secure) {
+                    socket = Server.context.getSocketFactory().createSocket();
+                } else {
+                    socket = new Socket();
+                }
                 /* Set timeout for connection establishment, throwing ConnectException */
                 socket.connect(new InetSocketAddress(randomHost.getHostname(), randomHost.getPort()), SERVER_TIMEOUT);
+
+
                 /* Set timeout for read() (also readUTF()!), throwing SocketTimeoutException */
                 socket.setSoTimeout(SERVER_TIMEOUT);
                 
@@ -133,6 +138,13 @@ public class ServerList {
                 /* Unclassified exception */
                 Server.logger.warning(randomHost.toString() + " IOException");
                 removeServer(randomHost,secure);
+            } finally {
+                try {
+                    if (socket != null)
+                        socket.close();
+                } catch (IOException e) {
+                    Server.logger.warning("IOException! Disconnect!");
+                }
             }
         }
     }

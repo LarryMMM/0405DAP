@@ -535,8 +535,16 @@ public class WorkerThread extends Thread {
 
         List<ResourceTemplate> result = new ArrayList<>();
 
-        //!!! Need SSL.
-        try (Socket socket = new Socket(host.getHostname(), host.getPort())) {
+        // Need SSL!!!
+        Socket socket = null;
+        try {
+            if (secure) {
+                socket = Server.context.getSocketFactory().createSocket();
+            } else {
+                socket = new Socket();
+            }
+
+            socket = new Socket(host.getHostname(), host.getPort());
 
             Server.logger.log(Level.FINE, "querying to {0}", socket.getRemoteSocketAddress().toString());
             socket.setSoTimeout(3000);
