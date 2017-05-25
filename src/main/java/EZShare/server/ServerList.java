@@ -22,36 +22,37 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- *
  * @author Wenhao Zhao
  */
 public class ServerList {
     public static final int SERVER_TIMEOUT = (int) Server.EXCHANGE_PERIOD / 2;
-    
+
     private final List<Host> serverList = new ArrayList<>();
     private final List<Host> secure_serverList = new ArrayList<>();
-    
-//    public ServerList() {
-//        /* Add a default dummy host (which is of course not available) */
-//        Host host = new Host("localhorse", 9527);
-//        this.serverList.add(host);
-//    }
-    
+
+    /*
+    public ServerList() {
+        // Add a default dummy host (which is of course not available)
+        Host host = new Host("localhorse", 9527);
+        this.serverList.add(host);
+    }
+    */
+
     public synchronized List<Host> getServerList(boolean secure) {
-        if(secure){
+        if (secure) {
             return secure_serverList;
-        }else {
+        } else {
             return serverList;
         }
     }
-            
-    public synchronized int updateServerList(List<Host> inputServerList,boolean secure) {
+
+    public synchronized int updateServerList(List<Host> inputServerList, boolean secure) {
         List<Host> serverList;
         ConcurrentHashMap<Socket, Subscription> relay;
-        if(secure){
+        if (secure) {
             serverList = this.secure_serverList;
             relay = Server.secure_relay;
-        }   else {
+        } else {
             serverList = this.serverList;
             relay = Server.unsecure_relay;
         }
@@ -61,19 +62,20 @@ public class ServerList {
                 Discard host if (1) already in the list (2) is a local address
 
             */
-            if (!containsHost(inputHost,secure) &&
-                    !(isMyIpAddress(inputHost.getHostname()) && (inputHost.getPort()==Server.PORT||inputHost.getPort()==Server.SPORT))) {
+            if (!containsHost(inputHost, secure) &&
+                    !(isMyIpAddress(inputHost.getHostname()) && (inputHost.getPort() == Server.PORT || inputHost.getPort() == Server.SPORT))) {
                 serverList.add(inputHost);
 
                 //for each subscription connection.
-                for (Map.Entry<Socket, Subscription> s: Server.subscriptions.entrySet()) {
-                    String orgin = s.getValue().getOrigin();
-                    boolean isrelay = s.getValue().getSubscribeMessage().isRelay();
-                    boolean issecure = s.getKey().getClass().equals(SSLSocket.class);
-                    //check whether this client need to be relayed for this exchange.
-                    if(isrelay&&(issecure==secure)){
-                        //relay to this server for the client
-                        Server.doSingleSubscriberRelay(orgin,inputHost,s.getValue().getSubscribeMessage(),secure);
+                for (Map.Entry<Socket, Subscription> s : Server.subscriptions.entrySet()) {
+                    String origin = s.getValue().getOrigin();
+                    boolean isRelay = s.getValue().getSubscribeMessage().isRelay();
+                    boolean isSecure = s.getValue().isSecure();
+                    // Check whether this client need to be relayed for this exchange.
+                    // If it is a relay subscription && NewHost.secure == thisSubscription.secure
+                    if (isRelay && (secure == isSecure)) {
+                        // Supplement! Relay to this server for the client
+                        Server.doSingleSubscriberRelay(origin, inputHost, s.getValue().getSubscribeMessage(), secure);
                     }
                 }
 
@@ -82,21 +84,21 @@ public class ServerList {
         }
         return addCount;
     }
-    
+
     public synchronized void regularExchange(boolean secure) {
         List<Host> serverList;
-        if(secure){
+        if (secure) {
             serverList = this.secure_serverList;
-        }   else {
+        } else {
             serverList = this.serverList;
         }
 
         if (serverList.size() > 0) {
             int randomIndex = ThreadLocalRandom.current().nextInt(0, serverList.size());
             Host randomHost = serverList.get(randomIndex);
-            
+
             Socket socket = null;
-            
+
             try {
                 // Need SSL!!!
                 if (secure) {
@@ -110,12 +112,12 @@ public class ServerList {
 
                 /* Set timeout for read() (also readUTF()!), throwing SocketTimeoutException */
                 socket.setSoTimeout(SERVER_TIMEOUT);
-                
+
                 DataInputStream input = new DataInputStream(socket.getInputStream());
                 DataOutputStream output = new DataOutputStream(socket.getOutputStream());
 
                 Server.logger.fine("Regular EXCHANGE to " + socket.getRemoteSocketAddress());
-                
+
                 ExchangeMessage exchangeMessage = new ExchangeMessage(serverList);
 
                 String JSON = new Gson().toJson(exchangeMessage);
@@ -123,21 +125,21 @@ public class ServerList {
                 output.flush();
 
                 String response = input.readUTF();
-                
+
                 if (response.contains("error"))
                     Server.logger.warning("RECEIVED : " + response);
                 if (response.contains("success"))
                     Server.logger.fine("RECEIVED : " + response);
             } catch (ConnectException ex) {
                 Server.logger.warning(randomHost.toString() + " connection timeout");
-                removeServer(randomHost,secure);
+                removeServer(randomHost, secure);
             } catch (SocketTimeoutException ex) {
                 Server.logger.warning(randomHost.toString() + " readUTF() timeout");
-                removeServer(randomHost,secure);
+                removeServer(randomHost, secure);
             } catch (IOException ex) {
                 /* Unclassified exception */
                 Server.logger.warning(randomHost.toString() + " IOException");
-                removeServer(randomHost,secure);
+                removeServer(randomHost, secure);
             } finally {
                 try {
                     if (socket != null)
@@ -148,35 +150,35 @@ public class ServerList {
             }
         }
     }
-    
-    public synchronized void removeServer(Host inputHost,boolean secure) {
+
+    public synchronized void removeServer(Host inputHost, boolean secure) {
         List<Host> serverList;
         ConcurrentHashMap<Socket, Subscription> relay;
-        if(secure){
+        if (secure) {
             serverList = this.secure_serverList;
             relay = Server.secure_relay;
-        }   else {
+        } else {
             serverList = this.serverList;
             relay = Server.unsecure_relay;
         }
 
         //delete all subscription relayed to that server
-        for (Map.Entry<Socket, Subscription> s: relay.entrySet()) {
+        for (Map.Entry<Socket, Subscription> s : relay.entrySet()) {
             //if the subscription has the same target as the deleted host
-            if(s.getValue().getTarget().toString().equals(inputHost.toString())){
-                Server.closeSubscription(s.getKey(),s.getValue(),secure);
+            if (s.getValue().getTarget().toString().equals(inputHost.toString())) {
+                Server.closeSubscription(s.getKey(), s.getValue(), secure);
             }
         }
 
         serverList.remove(inputHost);
 
     }
-    
-    private synchronized boolean containsHost(Host inputHost,boolean secure) {
+
+    private synchronized boolean containsHost(Host inputHost, boolean secure) {
         List<Host> serverList;
-        if(secure){
+        if (secure) {
             serverList = this.secure_serverList;
-        }   else {
+        } else {
             serverList = this.serverList;
         }
         for (Host host : serverList) {
@@ -186,7 +188,7 @@ public class ServerList {
         }
         return false;
     }
-    
+
     private boolean isMyIpAddress(String ipAddress) {
         InetAddress addr;
         try {

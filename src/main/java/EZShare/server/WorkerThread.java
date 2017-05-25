@@ -10,6 +10,7 @@ import java.util.*;
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
 
+import javax.net.ssl.SSLSocket;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 
@@ -23,7 +24,7 @@ public class WorkerThread extends Thread {
     private ServerList serverList;
     private ConcurrentHashMap<Socket, Subscription> relay;
 
-    private boolean secure;
+    private boolean secure = false;
     private DataOutputStream output;
     private DataInputStream input;
     private String ClientAddress;
@@ -36,10 +37,14 @@ public class WorkerThread extends Thread {
      * @param fileList   reference of file list.
      * @param serverList reference of server list.
      */
-    public WorkerThread(Socket client, FileList fileList, ServerList serverList) throws IOException {
+    public WorkerThread(Socket client, FileList fileList, ServerList serverList, boolean secure) throws IOException {
         this.client = client;
         this.fileList = fileList;
         this.serverList = serverList;
+
+        // Is it a Secure Socket?
+        this.secure = secure;
+        Server.logger.log(Level.INFO, "SecureSocket : {0}", this.secure);
     }
 
     @Override
@@ -159,7 +164,7 @@ public class WorkerThread extends Thread {
                 this.output.flush();
 
                 //put the subscription in list
-                Server.subscriptions.put(this.client, new Subscription(subscribeMessage, this.ClientAddress));
+                Server.subscriptions.put(this.client, new Subscription(subscribeMessage, this.ClientAddress, secure));
 
                 Server.logger.log(Level.FINE, "{0} : Resource subscribed!(relay=false)", this.ClientAddress);
 
@@ -181,7 +186,7 @@ public class WorkerThread extends Thread {
                 int size = 0;
 
                 //add to local subscriptions
-                Server.subscriptions.put(this.client, new Subscription(subscribeMessage, this.ClientAddress));
+                Server.subscriptions.put(this.client, new Subscription(subscribeMessage, this.ClientAddress, secure));
 
 
                 //create remote subscription sockets
@@ -641,5 +646,22 @@ public class WorkerThread extends Thread {
         } catch (URISyntaxException ex) {
             Server.logger.log(Level.WARNING, "{0} : unable to create URI", this.ClientAddress);
         }
+    }
+
+    // For test
+    public boolean isSecure() {
+        return secure;
+    }
+
+    public void setSecure(boolean secure) {
+        this.secure = secure;
+    }
+
+    public Socket getClient() {
+        return client;
+    }
+
+    public void setClient(Socket client) {
+        this.client = client;
     }
 }

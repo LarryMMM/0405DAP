@@ -19,24 +19,20 @@ import org.junit.Test;
 public class WorkerThreadTest {
 
     /* Please configure an existing and accessible file path before commencing testing. */
-    private final String existingFilePath = "file:///Users/nek/.bash_profile";
+    protected final String existingFilePath = "file:///Users/nek/.bash_profile";
     
-    private WorkerThread w = null;
-    private List<String> outputJsons = null;
-    
-    public WorkerThreadTest() {
-        refreshWorkerThread();
-    }
-    
-    private void refreshWorkerThread() {
+    protected WorkerThread w = null;
+    protected List<String> outputJsons = null;
+
+    protected void refreshWorkerThread() {
         try {
-            w = new WorkerThread(new Socket(), new FileList(), new ServerList());
+            w = new WorkerThread(new Socket(), new FileList(), new ServerList(), false);
         } catch (IOException e) {
             Assert.fail(e.getMessage());
         }
     }
     
-    private List<String> receptionTest(String inputFileName) throws IOException {
+    protected List<String> receptionTest(String inputFileName) throws IOException {
         BufferedReader br = new BufferedReader(new FileReader(System.getProperty("user.dir") + "/src/test/java/test/jsons/" + inputFileName));
         String json = "";
         for (String line = br.readLine(); line != null; line = br.readLine()) {
@@ -47,7 +43,7 @@ public class WorkerThreadTest {
         return w.reception(json);
     }
     
-    private List<String> receptionShareOrFetchTest(String inputFileName, String filePath, String secret) throws IOException {
+    protected List<String> receptionShareOrFetchTest(String inputFileName, String filePath, String secret) throws IOException {
         BufferedReader br = new BufferedReader(new FileReader(System.getProperty("user.dir") + "/src/test/java/test/jsons/" + inputFileName));
         String json = "";
         for (String line = br.readLine(); line != null; line = br.readLine()) {
@@ -62,7 +58,7 @@ public class WorkerThreadTest {
         return w.reception(json);
     }
     
-    private void checkIndexContentAndDisplay(int index, String subMessageContent) {
+    protected void checkIndexContentAndDisplay(int index, String subMessageContent) {
         System.out.println(outputJsons.get(index));
         Assert.assertEquals(true, outputJsons.get(index).contains(subMessageContent));
     }

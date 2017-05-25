@@ -13,16 +13,19 @@ public class Subscription {
     private SubscribeMessage subscribeMessage;
     private String origin;
     private Host target;
+    private boolean secure;
 
-    public Subscription(SubscribeMessage subscribeMessage, String origin, Host target) {
+    public Subscription(SubscribeMessage subscribeMessage, String origin, Host target, boolean secure) {
         this.origin = origin;
         this.target = target;
         this.subscribeMessage = subscribeMessage;
+        this.secure = secure;
     }
 
-    public Subscription(SubscribeMessage subscribeMessage, String origin) {
+    public Subscription(SubscribeMessage subscribeMessage, String origin, boolean secure) {
         this.origin = origin;
         this.subscribeMessage = subscribeMessage;
+        this.secure = secure;
     }
 
 
@@ -49,6 +52,14 @@ public class Subscription {
 
     public String getOrigin() {
         return origin;
+    }
+
+    public boolean isSecure() {
+        return secure;
+    }
+
+    public void setSecure(boolean secure) {
+        this.secure = secure;
     }
 
 }

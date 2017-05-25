@@ -140,7 +140,7 @@ public class Server {
 
             if (response.contains("success")) {
                 logger.log(Level.FINE, "{0} successful relayed", host.toString());
-                relay.put(socket, new Subscription(relay_message, ClientAddress, host));
+                relay.put(socket, new Subscription(relay_message, ClientAddress, host, secure));
             } else {
                 logger.log(Level.WARNING, "{0} failed when relaying", host.toString());
             }
@@ -339,7 +339,7 @@ public class Server {
 
                             /* Assign a worker thread for this socket. */
                             try {
-                                Server.threadPool.submit(new WorkerThread(client, fileList, serverList));
+                                Server.threadPool.submit(new WorkerThread(client, fileList, serverList, false));
                             } catch (IOException e) {
                                 logger.log(Level.WARNING, "{0} cannot create stream", client.getRemoteSocketAddress().toString());
                                 client.close();
@@ -369,7 +369,7 @@ public class Server {
 
                             /* Assign a worker thread for this socket. */
                             try {
-                                Server.threadPool.submit(new WorkerThread(client, fileList, serverList));
+                                Server.threadPool.submit(new WorkerThread(client, fileList, serverList, true));
                             } catch (IOException e) {
                                 logger.log(Level.WARNING, "{0} cannot create stream", client.getRemoteSocketAddress().toString());
                                 client.close();

@@ -111,8 +111,8 @@ public class Client {
      */
     private static Host getHost(CommandLine line) {
         //parse commandline args to Host object
-        String hostname = line.hasOption("host") ? line.getOptionValue("host", "") : "localhost";
-        Integer port = line.hasOption("port") ? Integer.valueOf(line.getOptionValue("port", "")) : 3000;
+        String hostname = line.getOptionValue("host", "localhost");
+        Integer port = Integer.valueOf(line.getOptionValue("port", "3780"));
         return new Host(hostname, port);
     }
 
@@ -606,7 +606,6 @@ public class Client {
             helpFormatter.printHelp("EZShare.Client", options);
         } catch (ConnectException e) {
             logger.warning("Socket connection timeout!");
-            e.printStackTrace();
         } catch (ArrayIndexOutOfBoundsException | NumberFormatException e) {
             //when value of -servers option invalid
             logger.warning("Server address invalid.");
