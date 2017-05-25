@@ -544,7 +544,7 @@ public class WorkerThread extends Thread {
                 socket = new Socket();
             }
 
-            socket = new Socket(host.getHostname(), host.getPort());
+            socket.connect(new InetSocketAddress(host.getHostname(), host.getPort()));
 
             Server.logger.log(Level.FINE, "querying to {0}", socket.getRemoteSocketAddress().toString());
             socket.setSoTimeout(3000);
