@@ -490,13 +490,11 @@ public class Client {
             }
 
             //set debug on if toggled
-            /*
             if (!line.hasOption("debug")) {
                 logger.setFilter((LogRecord record) -> (false));
             } else {
                 logger.info("setting debug on");
             }
-            */
 
             //get destination host from commandline args
             Host host = getHost(line);
@@ -507,17 +505,17 @@ public class Client {
 
             // SSLSocket? Or plain Socket?
             if (line.hasOption("secure")) {
-                String keystorePath = "keystore/client.keystore";
-                String trustKeystorePath = "keystore/trust-ca.keystore";
+                String keystorePath = "/client.keystore";
+                String trustKeystorePath = "/trust-ca.keystore";
                 String keystorePassword = "123456";
                 SSLContext context = SSLContext.getInstance("SSL");
 
                 KeyStore clientKeystore = KeyStore.getInstance("pkcs12");
-                FileInputStream keystoreFis = new FileInputStream(keystorePath);
+                InputStream keystoreFis = Client.class.getResourceAsStream(keystorePath);
                 clientKeystore.load(keystoreFis, keystorePassword.toCharArray());
 
                 KeyStore trustKeystore = KeyStore.getInstance("jks");
-                FileInputStream trustKeystoreFis = new FileInputStream(trustKeystorePath);
+                InputStream trustKeystoreFis = Client.class.getResourceAsStream(trustKeystorePath);
                 trustKeystore.load(trustKeystoreFis, keystorePassword.toCharArray());
 
                 KeyManagerFactory kmf = KeyManagerFactory.getInstance("sunx509");

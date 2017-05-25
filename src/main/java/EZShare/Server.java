@@ -11,10 +11,7 @@ import EZShare.server.WorkerThread;
 import com.google.gson.Gson;
 import org.apache.commons.cli.*;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.*;
 import java.net.*;
 import java.security.*;
 import java.security.cert.CertificateException;
@@ -271,13 +268,12 @@ public class Server {
                 SECRET = line.getOptionValue("secret");
             }
             // if debug not toggle, cancel all logs.
-            /*
             if (!line.hasOption("debug")) {
                 logger.setFilter((LogRecord record) -> (false));
             } else {
                 logger.info("setting debug on");
             }
-            */
+
 
             logger.info("Using advertised hostname: " + HOST);
             logger.info(String.valueOf("Using connection interval limit: " + INTERVAL));
@@ -289,17 +285,17 @@ public class Server {
 
 
             /* SSL Context! */
-            String keystorePath = "keystore/server.keystore";
-            String trustKeystorePath = "keystore/trust-ca.keystore";
+            String keystorePath = "/server.keystore";
+            String trustKeystorePath = "/trust-ca.keystore";
             String keystorePassword = "123456";
             Server.context = SSLContext.getInstance("SSL");
 
             KeyStore keystore = KeyStore.getInstance("pkcs12");
-            FileInputStream keystoreFis = new FileInputStream(keystorePath);
+            InputStream keystoreFis = Server.class.getResourceAsStream(keystorePath);
             keystore.load(keystoreFis, keystorePassword.toCharArray());
 
             KeyStore trustKeystore = KeyStore.getInstance("jks");
-            FileInputStream trustKeystoreFis = new FileInputStream(trustKeystorePath);
+            InputStream trustKeystoreFis = Server.class.getResourceAsStream(trustKeystorePath);
             trustKeystore.load(trustKeystoreFis, keystorePassword.toCharArray());
 
             KeyManagerFactory kmf = KeyManagerFactory.getInstance("sunx509");

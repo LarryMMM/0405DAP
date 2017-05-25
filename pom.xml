@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com</groupId>
     <artifactId>EZShare</artifactId>
-    <version>1.2</version>
+    <version>1.5</version>
     <packaging>jar</packaging>
     
     <!-- mvn assembly:assembly -->
@@ -21,8 +21,8 @@
                         <descriptorRef>jar-with-dependencies</descriptorRef>  
                     </descriptorRefs>  
                 </configuration>  
-            </plugin>  
-        </plugins>  
+            </plugin>
+        </plugins>
     </build>
     
     <properties>
