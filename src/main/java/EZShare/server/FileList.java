@@ -2,6 +2,7 @@ package EZShare.server;
 
 import EZShare.Server;
 import EZShare.message.ResourceTemplate;
+import EZShare.message.SubscribeMessage;
 import com.google.gson.Gson;
 
 import java.io.DataOutputStream;
@@ -34,24 +35,42 @@ public class FileList {
 
         //Travers all unrelayed subscriptions.
         for (Map.Entry<Socket,Subscription> s: Server.subscriptions.entrySet()) {
-            //get query conditions
-            ResourceTemplate query = s.getValue().getSubscribeMessage().getResourceTemplate();
+
             //get socket
             Socket socket = s.getKey();
 
-            //if the resource matches the subscription.
-            if(query.match(candidate)){
-                try {
-                    DataOutputStream output = new DataOutputStream(socket.getOutputStream());
-                    //send resource to that particular socket.
-                    output.writeUTF(gson.toJson(candidate,ResourceTemplate.class));
-                    output.flush();
-                    Server.logger.log(Level.FINE,"Matched resource sent:"+candidate,socket.getRemoteSocketAddress().toString());
-                    //increase result size
-                    Server.subscriptions.get(socket).addResult(1);
+            //note down whether the message has been sent to this socket
+            boolean sent = false;
 
-                }catch (IOException e){
-                    Server.logger.log(Level.WARNING,"{0} IOException when sending subscribed resource!"+e.getMessage());
+            //get query conditions
+            for (Map.Entry<SubscribeMessage,Integer> entry: s.getValue().getSubscribeMessage().entrySet()) {
+
+                ResourceTemplate query = entry.getKey().getResourceTemplate();
+
+                //if the resource matches the subscription.
+                if (query.match(candidate)) {
+                    try {
+                        if (!sent){
+                            DataOutputStream output = new DataOutputStream(socket.getOutputStream());
+                            //send resource to that particular socket.
+
+                            String c = gson.toJson(candidate);
+                            ResourceTemplate encrypted_candidate = gson.fromJson(c,ResourceTemplate.class);
+
+                            output.writeUTF(gson.toJson(encrypted_candidate, ResourceTemplate.class));
+                            output.flush();
+                            Server.logger.log(Level.FINE, "Matched resource sent:" + candidate, socket.getRemoteSocketAddress().toString());
+                            //set sent to true to prevent send a same resource twice
+                            sent=true;
+                        }
+                        //increase result size
+                        Server.subscriptions.get(socket).addResult(entry.getKey().getId());
+                        //break to avoid send one message several times
+
+
+                    } catch (IOException e) {
+                        Server.logger.log(Level.WARNING, "{0} IOException when sending subscribed resource!" + e.getMessage());
+                    }
                 }
             }
         }

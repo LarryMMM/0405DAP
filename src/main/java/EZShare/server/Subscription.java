@@ -1,7 +1,14 @@
 package EZShare.server;
 
 import EZShare.message.Host;
+import EZShare.message.ResourceTemplate;
 import EZShare.message.SubscribeMessage;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Encapsulation of subscriptions
@@ -9,8 +16,7 @@ import EZShare.message.SubscribeMessage;
  * @author zenanz
  */
 public class Subscription {
-    private int resultSize = 0;
-    private SubscribeMessage subscribeMessage;
+    private ConcurrentHashMap<SubscribeMessage,Integer> subscribeMessage = new ConcurrentHashMap<>();
     private String origin;
     private Host target;
     private boolean secure;
@@ -18,32 +24,49 @@ public class Subscription {
     public Subscription(SubscribeMessage subscribeMessage, String origin, Host target, boolean secure) {
         this.origin = origin;
         this.target = target;
-        this.subscribeMessage = subscribeMessage;
+        this.subscribeMessage.put(subscribeMessage,0);
         this.secure = secure;
     }
 
     public Subscription(SubscribeMessage subscribeMessage, String origin, boolean secure) {
         this.origin = origin;
-        this.subscribeMessage = subscribeMessage;
+        this.subscribeMessage.put(subscribeMessage,0);
         this.secure = secure;
     }
 
 
-    public SubscribeMessage getSubscribeMessage() {
+    public void addSubscribeMessage(SubscribeMessage subscribeMessage){
+        this.subscribeMessage.put(subscribeMessage,0);
+    }
+
+    public void removeSubscribeMessage(String id){
+        for (Map.Entry<SubscribeMessage,Integer> entry: this.subscribeMessage.entrySet()) {
+           if (entry.getKey().getId().equals(id)){
+               this.subscribeMessage.remove(entry.getKey());
+           }
+        }
+    }
+
+    public ConcurrentHashMap<SubscribeMessage,Integer> getSubscribeMessage() {
         return this.subscribeMessage;
     }
 
-    @Override
-    public String toString() {
-        return this.subscribeMessage.getId() + "|currentSize:" + resultSize;
+    public void addResult(String id) {
+        for (Map.Entry<SubscribeMessage,Integer> entry: this.subscribeMessage.entrySet()) {
+            if (entry.getKey().getId().equals(id)){
+                int size = entry.getValue()+1;
+                this.subscribeMessage.put(entry.getKey(),size);
+            }
+        }
     }
 
-    public int getResultSize() {
-        return resultSize;
-    }
-
-    public void addResult(int number) {
-        this.resultSize += number;
+    public int getResultSize(String id){
+        for (Map.Entry<SubscribeMessage,Integer> entry: this.subscribeMessage.entrySet()) {
+            if (entry.getKey().getId().equals(id)){
+                return entry.getValue();
+            }
+        }
+        return 0;
     }
 
     public Host getTarget() {

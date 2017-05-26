@@ -22,7 +22,7 @@ public class WorkerThread extends Thread {
     private Socket client;
     private FileList fileList;
     private ServerList serverList;
-    private ConcurrentHashMap<Socket, Subscription> relay;
+    private ConcurrentHashMap<Host, Socket> relay;
 
     private boolean secure = false;
     private DataOutputStream output;
@@ -170,31 +170,31 @@ public class WorkerThread extends Thread {
 
                 //block until user terminate.
 
-                while (!isTerminated()) {
+                while (true) {
+                    String next;
+                    try {
+                        if((next = this.input.readUTF())!=null) {
+                            if (next.contains("UNSUBSCRIBE")) {
+                                //unsub for this subscription
+                                UnsubscribeMessage unsubscribeMessage = gson.fromJson(next, UnsubscribeMessage.class);
+                                String resultsize = getResultSizeJson((long) Server.subscriptions.get(this.client).getResultSize(unsubscribeMessage.getId()));
+                                this.output.writeUTF(resultsize);
+                                this.output.flush();
+                                Server.logger.log(Level.INFO, "{0} : Terminating subscription " + unsubscribeMessage.getId() + " with resultSize:" + resultsize, this.ClientAddress);
+                                break;
+
+                            } else if (next.contains("SUBSCRIBE")) {
+                                SubscribeMessage newsubscribe = gson.fromJson(next, SubscribeMessage.class);
+                                Server.subscriptions.get(this.client).addSubscribeMessage(newsubscribe);
+                            }
+                        }
+                    } catch (IOException e) {
+
+                    }
                 }
 
-                int size = Server.subscriptions.get(client).getResultSize();
-                Server.logger.log(Level.INFO, "{0} : Terminating subscription with resultSize:" + size, this.ClientAddress);
-
-                String resultSize = getResultSizeJson((long) size);
-
-                Server.subscriptions.remove(client);
-
-                outputJsons.add(resultSize);
 
             } else if (subscribeMessage.isRelay()) {
-                int size = 0;
-
-                //add to local subscriptions
-                Server.subscriptions.put(this.client, new Subscription(subscribeMessage, this.ClientAddress, secure));
-
-
-                //create remote subscription sockets
-
-                for (Host h : this.serverList.getServerList(secure)) {
-                    Server.logger.log(Level.FINE, "{0} : relaying to", h.toString());
-                    Server.doSingleSubscriberRelay(this.ClientAddress, h, subscribeMessage, this.secure);
-                }
 
                 //send success message.
                 String response = getSubscribeSuccessMessageJson(subscribeMessage.getId());
@@ -202,62 +202,38 @@ public class WorkerThread extends Thread {
                 this.output.writeUTF(response);
                 this.output.flush();
 
+                //put the subscription in list
+                Server.subscriptions.put(this.client, new Subscription(subscribeMessage, this.ClientAddress, secure));
+
+                SubscribeMessage forwarded = new SubscribeMessage(false,subscribeMessage.getId(),subscribeMessage.getResourceTemplate());
+                serverList.doMessageRealy(gson.toJson(forwarded));
+
                 Server.logger.log(Level.FINE, "{0} : Resource subscribed!(relay=true)", this.ClientAddress);
 
-                //wait for user to terminate
-                while (!isTerminated()) {
+                //block until user terminate.
+                String next;
 
-
-                    //listen to remote subscriptions
-                    for (ConcurrentHashMap.Entry<Socket, Subscription> s : this.relay.entrySet()) {
-                        //if the socket is relayed for this client
-                        if (s.getValue().getOrigin().equals(this.ClientAddress)) {
-                            Socket relayed = s.getKey();
-                            DataInputStream inputStream = new DataInputStream(relayed.getInputStream());
-
-                            //read until exception
-                            while (true) {
-                                //Server.logger.log(Level.FINE, "{0} : listening", this.ClientAddress);
-                                relayed.setSoTimeout(1);
-                                try {
-                                    //read resource from other servers
-                                    String resource = inputStream.readUTF();
-                                    //write resource to subscriber
-                                    this.output.writeUTF(resource);
-                                    this.output.flush();
-                                    Server.logger.log(Level.FINE, "{0} : Resource Forwarded!" + resource, this.ClientAddress);
-                                    size++;
-
-                                } catch (IOException e) {
-                                    //end reading and goto next socket
-                                    break;
-                                }
-                            }
-
-                        }
-                    }
-
-                }
-
-                //close remote subscriptions
-                for (ConcurrentHashMap.Entry<Socket, Subscription> s : this.relay.entrySet()) {
-                    if (s.getValue().getOrigin().equals(this.ClientAddress)) {
-                        Server.closeSubscription(s.getKey(), s.getValue(), secure);
-                        //remove remote subscription
+                while (true){
+                    if((next = this.input.readUTF())!=null) {
+                        break;
                     }
                 }
 
-                //calculate total size
-                size += Server.subscriptions.get(client).getResultSize();
+                serverList.doMessageRealy(gson.toJson(new UnsubscribeMessage(subscribeMessage.getId())));
 
-                Server.logger.log(Level.INFO, "{0} : Terminating subscription with resultsize:" + size, this.ClientAddress);
+                Subscription subscription = Server.subscriptions.get(this.client);
 
-                String resultsize = getResultSizeJson((long) size);
+                int size = 0;
 
-                //remove local subscription
-                Server.subscriptions.remove(client);
+                for (Map.Entry<SubscribeMessage,Integer> entry: subscription.getSubscribeMessage().entrySet()) {
+                    size+=entry.getValue();
+                }
 
-                outputJsons.add(resultsize);
+                JSON = getResultSizeJson((long)size);
+
+                this.output.writeUTF(JSON);
+                this.output.flush();
+
 
             }
 
@@ -391,7 +367,7 @@ public class WorkerThread extends Thread {
 
             if (exchangeMessage.isValid()) {
                 //all servers valid, add to server list.
-                this.serverList.updateServerList(inputServerList, secure);
+                this.serverList.updateServerList(inputServerList);
                 Server.logger.log(Level.FINE, "{0} : servers added", this.ClientAddress);
                 outputJsons.add(getSuccessMessageJson());
             } else {
@@ -445,7 +421,7 @@ public class WorkerThread extends Thread {
                 relayMessage.getResourceTemplate().setChannel("");
 
                 //append result set by querying remote servers
-                for (Host h : this.serverList.getServerList(secure)) {
+                for (Host h : this.serverList.getServerList()) {
                     List<ResourceTemplate> rtl = doSingleQueryRelay(h, relayMessage);
                     if (!rtl.isEmpty())
                         result.addAll(rtl);

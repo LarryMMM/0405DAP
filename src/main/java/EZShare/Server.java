@@ -2,6 +2,7 @@ package EZShare;
 
 import EZShare.log.LogCustomFormatter;
 import EZShare.message.Host;
+import EZShare.message.ResourceTemplate;
 import EZShare.message.SubscribeMessage;
 import EZShare.message.UnsubscribeMessage;
 import EZShare.server.FileList;
@@ -23,6 +24,7 @@ import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
+import java.util.logging.SocketHandler;
 import javax.net.ServerSocketFactory;
 import javax.net.ssl.*;
 
@@ -44,7 +46,8 @@ public class Server {
     public static SSLContext context = null;
     public static final Logger logger = LogCustomFormatter.getLogger(Server.class.getName());
     private static final FileList fileList = new FileList();
-    private static final ServerList serverList = new ServerList();
+    private static final ServerList serverList = new ServerList(false);
+    private static final ServerList secure_severList = new ServerList(true);
     private static final Gson gson = new Gson();
 
     /*
@@ -62,8 +65,8 @@ public class Server {
         Data structures for subscriptions and relayed subscriptions
     */
     public static ConcurrentHashMap<Socket, Subscription> subscriptions = new ConcurrentHashMap<>();
-    public static ConcurrentHashMap<Socket, Subscription> secure_relay = new ConcurrentHashMap<>();
-    public static ConcurrentHashMap<Socket, Subscription> unsecure_relay = new ConcurrentHashMap<>();
+    public static ConcurrentHashMap<Host, Socket> secure_relay = new ConcurrentHashMap<>();
+    public static ConcurrentHashMap<Host, Socket> unsecure_relay = new ConcurrentHashMap<>();
 
     /**
      * Construct command line options
@@ -96,126 +99,18 @@ public class Server {
         return buf.toString();
     }
 
-    /**
-     * Make a single relay subscription to remote server.
-     *
-     * @param host             Remote server.
-     * @param subscribeMessage The message client sent.(Should be forwarded)
-     */
-
-    public static void doSingleSubscriberRelay(String ClientAddress, Host host, SubscribeMessage subscribeMessage, boolean secure) {
-        ConcurrentHashMap<Socket, Subscription> relay;
-        //indicate which set of hosts to relay to.
-        if (secure) {
-            relay = secure_relay;
-        } else {
-            relay = unsecure_relay;
-        }
-
-        Socket socket = null;
-        try {
-            // Need SSL!!!
-            if (secure) {
-                socket = Server.context.getSocketFactory().createSocket();
-            } else {
-                socket = new Socket();
-            }
-            socket.connect(new InetSocketAddress(host.getHostname(), host.getPort()));
-
-
-            socket.setSoTimeout(3000);
-            logger.log(Level.FINE, "subscribing to {0}", socket.getRemoteSocketAddress().toString());
-
+    private synchronized static void forward(Socket socket){
+        try{
             DataInputStream inputStream = new DataInputStream(socket.getInputStream());
-            DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
+            socket.setSoTimeout(1);
+            String resource = inputStream.readUTF();
 
-            SubscribeMessage relay_message = new SubscribeMessage(false, subscribeMessage.getId(), subscribeMessage.getResourceTemplate());
-
-            String JSON = gson.toJson(relay_message);
-
-            outputStream.writeUTF(JSON);
-            outputStream.flush();
-
-            String response = inputStream.readUTF();
-
-            if (response.contains("success")) {
-                logger.log(Level.FINE, "{0} successful relayed", host.toString());
-                relay.put(socket, new Subscription(relay_message, ClientAddress, host, secure));
-            } else {
-                logger.log(Level.WARNING, "{0} failed when relaying", host.toString());
+            if (!resource.contains("resultSize")&&!resource.contains("error")&&!resource.contains("success")){
+                ResourceTemplate  resourceTemplate = gson.fromJson(resource,ResourceTemplate.class);
+                fileList.sendNotification(resourceTemplate);
             }
+        }catch (IOException e){
 
-
-        } catch (SocketTimeoutException e) {
-            logger.log(Level.WARNING, "{0} timeout when subscribe relay", host.toString());
-            serverList.removeServer(host, secure);
-        } catch (ConnectException e) {
-            logger.log(Level.WARNING, "{0} timeout when create subscribe socket", host.toString());
-            serverList.removeServer(host, secure);
-        } catch (IOException e) {
-            logger.log(Level.WARNING, "{0} IOException when subscribe relay", host.toString());
-            serverList.removeServer(host, secure);
-        } finally {
-            try {
-                if (socket != null)
-                    socket.close();
-            } catch (IOException e) {
-                logger.warning("IOException! Disconnect!");
-            }
-        }
-
-
-    }
-
-    /**
-     * Handle close up message.
-     *
-     * @param socket       Socket to close.
-     * @param subscription Description of this socket.
-     */
-    public static void closeSubscription(Socket socket, Subscription subscription, boolean secure) {
-        Host host = subscription.getTarget();
-        ConcurrentHashMap<Socket, Subscription> relay;
-        // indicate which set of hosts to relay to.
-        if (secure) {
-            relay = secure_relay;
-        } else {
-            relay = unsecure_relay;
-        }
-
-        try {
-            socket.setSoTimeout(3000);
-            DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
-            DataInputStream inputStream = new DataInputStream(socket.getInputStream());
-
-            logger.log(Level.FINE, "{0} : terminating subscribe relay {0}", socket.getRemoteSocketAddress().toString());
-
-            UnsubscribeMessage unsubscribeMessage = new UnsubscribeMessage(subscription.getSubscribeMessage().getId());
-            String JSON = gson.toJson(unsubscribeMessage);
-
-            outputStream.writeUTF(JSON);
-            outputStream.flush();
-
-            String response = inputStream.readUTF();
-
-            if (!response.contains("resultSize")) {
-                socket.close();
-                throw new IOException();
-            }
-
-            socket.close();
-
-        } catch (SocketTimeoutException e) {
-            logger.log(Level.WARNING, "{0} timeout when subscribe relay", host.toString());
-            serverList.removeServer(host, secure);
-        } catch (ConnectException e) {
-            logger.log(Level.WARNING, "{0} timeout when create subscribe socket", host.toString());
-            serverList.removeServer(host, secure);
-        } catch (IOException e) {
-            logger.log(Level.WARNING, "{0} IOException when subscribe relay", host.toString());
-            serverList.removeServer(host, secure);
-        } finally {
-            relay.remove(socket);
         }
 
     }
@@ -228,13 +123,13 @@ public class Server {
         TimerTask regularExchangeTask = new TimerTask() {
             @Override
             public void run() {
-                serverList.regularExchange(false);
+                serverList.regularExchange();
             }
         };
         TimerTask secure_regularExchangeTask = new TimerTask() {
             @Override
             public void run() {
-                serverList.regularExchange(true);
+                secure_severList.regularExchange();
             }
         };
         timer.schedule(regularExchangeTask, 0, EXCHANGE_PERIOD);
@@ -369,7 +264,7 @@ public class Server {
 
                             /* Assign a worker thread for this socket. */
                             try {
-                                Server.threadPool.submit(new WorkerThread(client, fileList, serverList, true));
+                                Server.threadPool.submit(new WorkerThread(client, fileList, secure_severList, true));
                             } catch (IOException e) {
                                 logger.log(Level.WARNING, "{0} cannot create stream", client.getRemoteSocketAddress().toString());
                                 client.close();
@@ -385,8 +280,21 @@ public class Server {
                 }
             });
 
+            Thread listener = new Thread(() -> {
+                while (true){
+                    for (Map.Entry<Host,Socket> entry: Server.unsecure_relay.entrySet()) {
+                        forward(entry.getValue());
+                    }
+                    for (Map.Entry<Host,Socket> entry: Server.secure_relay.entrySet()) {
+                        forward(entry.getValue());
+                    }
+                }
+
+            });
+
             plainSocket.start();
             sslSocket.start();
+            listener.start();
 
         } catch (IOException ex) {
             logger.warning(ex.getMessage());

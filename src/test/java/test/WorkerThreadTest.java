@@ -26,7 +26,7 @@ public class WorkerThreadTest {
 
     protected void refreshWorkerThread() {
         try {
-            w = new WorkerThread(new Socket(), new FileList(), new ServerList(), false);
+            w = new WorkerThread(new Socket(), new FileList(), new ServerList(true), false);
         } catch (IOException e) {
             Assert.fail(e.getMessage());
         }

@@ -14,7 +14,7 @@ import java.net.Socket;
 public class SecureWorkerThreadTest extends WorkerThreadTest {
     protected void refreshWorkerThread() {
         try {
-            w = new WorkerThread(new Socket(), new FileList(), new ServerList(), true);
+            w = new WorkerThread(new Socket(), new FileList(), new ServerList(true), true);
         } catch (IOException e) {
             Assert.fail(e.getMessage());
         }
