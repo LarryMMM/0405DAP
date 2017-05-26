@@ -42,11 +42,10 @@ public class Client {
     private static Options commandOptions() {
         //Build up command line options
         Options options = new Options();
-        options.addOption("relay", false, "set true to relay the request to other servers");
+        //options.addOption("relay", false, "set true to relay the request to other servers");
         options.addOption("id", true, "set the ID for subscribe request");
         options.addOption("subscribe", false, "subscribe resource from server");
         options.addOption("secure", false, "set true to initiate secure connection");
-        // options.addOption("sport", true, "server secure port, an integer");
         options.addOption("debug", false, "print debug information");
         options.addOption("fetch", false, "fetch resource from server");
         options.addOption("channel", true, "channel");
@@ -590,7 +589,8 @@ public class Client {
             }
 
             if (line.hasOption("subscribe")) {
-                boolean relay = line.hasOption("relay");
+                // boolean relay = line.hasOption("relay");
+                boolean relay = true;
                 //set local IP address as default ID.
                 String id = line.getOptionValue("id", socket.getLocalAddress().toString());
                 subscribeCommand(socket, resourceTemplate, relay, id);

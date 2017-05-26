@@ -33,7 +33,7 @@ public class ServerList {
     private final List<Host> serverList = new ArrayList<>();
 
 
-    public  ServerList(boolean seucre){
+    public ServerList(boolean seucre) {
         this.secure = seucre;
     }
     /*
@@ -54,7 +54,6 @@ public class ServerList {
         for (Host inputHost : inputServerList) {
             /* 
                 Discard host if (1) already in the list (2) is a local address
-
             */
             if (!containsHost(inputHost) &&
                     !(isMyIpAddress(inputHost.getHostname()) && (inputHost.getPort() == Server.PORT || inputHost.getPort() == Server.SPORT))) {
@@ -169,7 +168,7 @@ public class ServerList {
     }
 
 
-    public void openSubscribeRelay(Host target){
+    public void openSubscribeRelay(Host target) {
         Socket socket = null;
         ConcurrentHashMap<Host, Socket> relay;
 
@@ -188,28 +187,29 @@ public class ServerList {
             DataInputStream inputStream = new DataInputStream(socket.getInputStream());
 
 
-
             //traverse all subscribers
-            for (Map.Entry<Socket,Subscription> subscriber:Server.subscriptions.entrySet()) {
+            for (Map.Entry<Socket, Subscription> subscriber : Server.subscriptions.entrySet()) {
                 //get all subscribe message of this subscriber
                 ConcurrentHashMap<SubscribeMessage, Integer> messages = subscriber.getValue().getSubscribeMessage();
-                for (Map.Entry<SubscribeMessage, Integer> subscription:messages.entrySet()){
+                for (Map.Entry<SubscribeMessage, Integer> subscription : messages.entrySet()) {
                     //if this message have relay=true
-                    if (subscription.getKey().isRelay()){
+                    if (subscription.getKey().isRelay()) {
 
-                        SubscribeMessage forwarded = new SubscribeMessage(false,subscription.getKey().getId(),subscription.getKey().getResourceTemplate());
+                        SubscribeMessage forwarded = new SubscribeMessage(false, subscription.getKey().getId(), subscription.getKey().getResourceTemplate());
 
-                        String JSON = gson.toJson(forwarded,SubscribeMessage.class);
+                        String JSON = gson.toJson(forwarded, SubscribeMessage.class);
                         outputStream.writeUTF(JSON);
                         outputStream.flush();
 
+                        /*
                         String response = inputStream.readUTF();
 
-//                        if(response.contains("success")){
-//                            Server.logger.warning("From: " +subscriber.getKey().getRemoteSocketAddress() +
-//                                                        " relayed to: "+target.toString()+
-//                                                        " for "+subscription.getKey().getId());
-//                        }
+                        if(response.contains("success")){
+                            Server.logger.warning("From: " +subscriber.getKey().getRemoteSocketAddress() +
+                                                        " relayed to: "+target.toString()+
+                                                        " for "+subscription.getKey().getId());
+                        }
+                        */
 
                     }
 
@@ -217,19 +217,19 @@ public class ServerList {
 
 
             }
-            relay.put(target,socket);
-            Server.logger.warning("relay connection opened "+target.toString());
+            relay.put(target, socket);
+            Server.logger.warning("relay connection opened " + target.toString());
 
-        } catch (IOException e){
-            Server.logger.warning("IOException when subscribe relay to "+target.toString());
+        } catch (IOException e) {
+            Server.logger.warning("IOException when subscribe relay to " + target.toString());
         }
 
 
     }
 
-    public synchronized void closeSubscribeRelay(Host target){
+    public synchronized void closeSubscribeRelay(Host target) {
         Socket socket = null;
-        ConcurrentHashMap<Host,Socket> relay;
+        ConcurrentHashMap<Host, Socket> relay;
 
         try {
             if (secure) {
@@ -244,24 +244,23 @@ public class ServerList {
             DataInputStream inputStream = new DataInputStream(socket.getInputStream());
 
 
-
             //traverse all subscribers
-            for (Map.Entry<Socket,Subscription> subscriber:Server.subscriptions.entrySet()) {
+            for (Map.Entry<Socket, Subscription> subscriber : Server.subscriptions.entrySet()) {
                 //get all subscribe message of this subscriber
                 ConcurrentHashMap<SubscribeMessage, Integer> messages = subscriber.getValue().getSubscribeMessage();
-                for (Map.Entry<SubscribeMessage, Integer> subscription:messages.entrySet()){
+                for (Map.Entry<SubscribeMessage, Integer> subscription : messages.entrySet()) {
                     //if this message have relay=true
-                    if (subscription.getKey().isRelay()){
-                        String JSON = gson.toJson(new UnsubscribeMessage(subscription.getKey().getId()),UnsubscribeMessage.class);
+                    if (subscription.getKey().isRelay()) {
+                        String JSON = gson.toJson(new UnsubscribeMessage(subscription.getKey().getId()), UnsubscribeMessage.class);
                         outputStream.writeUTF(JSON);
                         outputStream.flush();
 
                         String response = inputStream.readUTF();
 
-                        if(response.contains("resultSize")){
-                            Server.logger.warning("Terminate from: " +subscriber.getKey().getRemoteSocketAddress() +
-                                    " relayed to: "+target.toString()+
-                                    " for "+subscription.getKey().getId());
+                        if (response.contains("resultSize")) {
+                            Server.logger.warning("Terminate from: " + subscriber.getKey().getRemoteSocketAddress() +
+                                    " relayed to: " + target.toString() +
+                                    " for " + subscription.getKey().getId());
                         }
 
                     }
@@ -273,12 +272,12 @@ public class ServerList {
             relay.remove(target);
 
 
-        } catch (IOException e){
-            Server.logger.warning("IOException when subscribe relay to "+target.toString());
+        } catch (IOException e) {
+            Server.logger.warning("IOException when subscribe relay to " + target.toString());
         }
     }
 
-    public synchronized void doMessageRealy(String JSON){
+    public synchronized void doMessageRealy(String JSON) {
 
         ConcurrentHashMap<Host, Socket> relay;
 
@@ -289,9 +288,8 @@ public class ServerList {
         }
 
 
-
-        try{
-            for(Map.Entry<Host,Socket> entry: relay.entrySet()){
+        try {
+            for (Map.Entry<Host, Socket> entry : relay.entrySet()) {
                 DataOutputStream outputStream = new DataOutputStream(entry.getValue().getOutputStream());
 
 
@@ -301,13 +299,13 @@ public class ServerList {
 
             }
 
-        }catch (IOException e){
-            Server.logger.warning("IOException when subscribe relay");
+        } catch (IOException e) {
+            Server.logger.warning("IOException when subscribe relay: " + e.getMessage());
         }
 
     }
 
-    public synchronized void refreshAllRelay(){
+    public synchronized void refreshAllRelay() {
         ConcurrentHashMap<Host, Socket> relay;
 
         if (secure) {
@@ -318,7 +316,7 @@ public class ServerList {
 
         relay = new ConcurrentHashMap<>();
 
-        for (Host h: this.serverList) {
+        for (Host h : this.serverList) {
             openSubscribeRelay(h);
         }
 

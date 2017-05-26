@@ -17,7 +17,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Level;
 
 /**
- *
  * @author Ying Li
  */
 public class FileList {
@@ -29,12 +28,13 @@ public class FileList {
 
     /**
      * Send notification to socket which linked to the client that subscribed the relevant resources.
+     *
      * @param candidate The published or shared resource.
      */
-    public void sendNotification(ResourceTemplate candidate){
+    public void sendNotification(ResourceTemplate candidate) {
 
         //Travers all unrelayed subscriptions.
-        for (Map.Entry<Socket,Subscription> s: Server.subscriptions.entrySet()) {
+        for (Map.Entry<Socket, Subscription> s : Server.subscriptions.entrySet()) {
 
             //get socket
             Socket socket = s.getKey();
@@ -43,25 +43,25 @@ public class FileList {
             boolean sent = false;
 
             //get query conditions
-            for (Map.Entry<SubscribeMessage,Integer> entry: s.getValue().getSubscribeMessage().entrySet()) {
+            for (Map.Entry<SubscribeMessage, Integer> entry : s.getValue().getSubscribeMessage().entrySet()) {
 
                 ResourceTemplate query = entry.getKey().getResourceTemplate();
 
                 //if the resource matches the subscription.
                 if (query.match(candidate)) {
                     try {
-                        if (!sent){
+                        if (!sent) {
                             DataOutputStream output = new DataOutputStream(socket.getOutputStream());
                             //send resource to that particular socket.
 
                             String c = gson.toJson(candidate);
-                            ResourceTemplate encrypted_candidate = gson.fromJson(c,ResourceTemplate.class);
+                            ResourceTemplate encrypted_candidate = gson.fromJson(c, ResourceTemplate.class);
 
                             output.writeUTF(gson.toJson(encrypted_candidate, ResourceTemplate.class));
                             output.flush();
                             Server.logger.log(Level.FINE, "Matched resource sent:" + candidate, socket.getRemoteSocketAddress().toString());
                             //set sent to true to prevent send a same resource twice
-                            sent=true;
+                            sent = true;
                         }
                         //increase result size
                         Server.subscriptions.get(socket).addResult(entry.getKey().getId());
@@ -69,7 +69,7 @@ public class FileList {
 
 
                     } catch (IOException e) {
-                        Server.logger.log(Level.WARNING, "{0} IOException when sending subscribed resource!" + e.getMessage());
+                        Server.logger.log(Level.WARNING, "{0} IOException when sending subscribed resource! ", e.getMessage());
                     }
                 }
             }
@@ -83,22 +83,19 @@ public class FileList {
      *
      * @param resourceTemplate Resource to be added.
      * @return boolean  Whether the resource is successfully added.
-     *
-     * */
+     */
     public boolean add(ResourceTemplate resourceTemplate) {
         lock.writeLock().lock();
-        try{
-            if(resourceTemplateList.isEmpty()){
+        try {
+            if (resourceTemplateList.isEmpty()) {
                 resourceTemplateList.add(resourceTemplate);
                 sendNotification(resourceTemplate);
                 return true;
-            }
-
-            else{
-                for(int i = 0 ; i < resourceTemplateList.size(); i++) {
+            } else {
+                for (int i = 0; i < resourceTemplateList.size(); i++) {
                     ResourceTemplate f = resourceTemplateList.get(i);
-                    if(f.getChannel().equals(resourceTemplate.getChannel()) && f.getUri().equals(resourceTemplate.getUri())){
-                        if(f.getOwner().equals(resourceTemplate.getOwner())){
+                    if (f.getChannel().equals(resourceTemplate.getChannel()) && f.getUri().equals(resourceTemplate.getUri())) {
+                        if (f.getOwner().equals(resourceTemplate.getOwner())) {
                             resourceTemplateList.set(i, resourceTemplate);
                             sendNotification(resourceTemplate);
                             return true;
@@ -111,7 +108,7 @@ public class FileList {
                 sendNotification(resourceTemplate);
                 return true;
             }
-        }finally {
+        } finally {
             lock.writeLock().unlock();
         }
     }
@@ -119,15 +116,13 @@ public class FileList {
     /**
      * delete a file from filelist
      *
-     *
-     * @param resourceTemplate  Resource to be removed.
+     * @param resourceTemplate Resource to be removed.
      * @return boolean  Whether the resource is successfully removed.
-     *
-     * */
+     */
     public boolean remove(ResourceTemplate resourceTemplate) {
         lock.writeLock().lock();
-        try{
-            for(int i = 0 ; i < resourceTemplateList.size(); i++) {
+        try {
+            for (int i = 0; i < resourceTemplateList.size(); i++) {
                 ResourceTemplate f = resourceTemplateList.get(i);
                 if (f.getChannel().equals(resourceTemplate.getChannel()) && f.getUri().equals(resourceTemplate.getUri()) && f.getOwner().equals(resourceTemplate.getOwner())) {
                     resourceTemplateList.remove(i);
@@ -135,7 +130,7 @@ public class FileList {
                 }
             }
             return false;
-        }finally {
+        } finally {
             lock.writeLock().unlock();
         }
     }
@@ -144,43 +139,41 @@ public class FileList {
     /**
      * search a certain list of file by owner, uri and channel in filelist
      *
-     *
-     * @param query  Resource in query.
+     * @param query Resource in query.
      * @return querylist    List of resources that match the query.
-     *
-     * */
+     */
     public List<ResourceTemplate> query(ResourceTemplate query) {
         lock.readLock().lock();
         List<ResourceTemplate> queryList = new ArrayList<>();
-        try{
-            for(ResourceTemplate candidate : resourceTemplateList) {
+        try {
+            for (ResourceTemplate candidate : resourceTemplateList) {
                 if (query.match(candidate)) {
                     queryList.add(candidate);
                 }
             }
             return queryList;
-        }finally {
+        } finally {
             lock.readLock().unlock();
         }
     }
-    
+
     /*
         I guess the query rule of "fetch" is different from that of "query"?
     */
     public List<ResourceTemplate> fetch(ResourceTemplate query) {
         lock.readLock().lock();
         List<ResourceTemplate> fetch = new ArrayList<>();
-        try{
-            for(ResourceTemplate candidate : resourceTemplateList) {
-                if (query.getChannel().equals(candidate.getChannel()) && 
-                    query.getUri().equals(candidate.getUri())) {
+        try {
+            for (ResourceTemplate candidate : resourceTemplateList) {
+                if (query.getChannel().equals(candidate.getChannel()) &&
+                        query.getUri().equals(candidate.getUri())) {
                     fetch.add(candidate);
                     return fetch;
                 }
             }
             return fetch;
-        }finally {
+        } finally {
             lock.readLock().unlock();
         }
-    }    
+    }
 }

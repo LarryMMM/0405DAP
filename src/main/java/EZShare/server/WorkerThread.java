@@ -60,7 +60,7 @@ public class WorkerThread extends Thread {
             /* Get input data. Remove \0 in order to prevent crashing. */
             String inputJson = input.readUTF();
 
-            inputJson = inputJson.replace("\0","");
+            inputJson = inputJson.replace("\0", "");
 
             /* Process and get output data. */
             List<String> outputJsons = reception(inputJson);
@@ -168,7 +168,7 @@ public class WorkerThread extends Thread {
                 while (true) {
                     String next;
                     try {
-                        if((next = this.input.readUTF())!=null) {
+                        if ((next = this.input.readUTF()) != null) {
                             if (next.contains("UNSUBSCRIBE")) {
                                 //unsub for this subscription
                                 UnsubscribeMessage unsubscribeMessage = gson.fromJson(next, UnsubscribeMessage.class);
@@ -177,7 +177,7 @@ public class WorkerThread extends Thread {
                                 this.output.writeUTF(resultsize);
                                 this.output.flush();
                                 Server.logger.log(Level.INFO, "{0} : Terminating subscription " + unsubscribeMessage.getId() + " with resultSize:" + resultsize, this.ClientAddress);
-                                if (Server.subscriptions.get(this.client).getSubscribeMessage().size()==0){
+                                if (Server.subscriptions.get(this.client).getSubscribeMessage().size() == 0) {
                                     break;
                                 }
 
@@ -202,27 +202,27 @@ public class WorkerThread extends Thread {
 
                 boolean needrefresh = true;
 
-                for (Map.Entry<Socket, Subscription> entry: Server.subscriptions.entrySet()){
+                for (Map.Entry<Socket, Subscription> entry : Server.subscriptions.entrySet()) {
                     ConcurrentHashMap<SubscribeMessage, Integer> sms = entry.getValue().getSubscribeMessage();
                     for (Map.Entry<SubscribeMessage, Integer> m : sms.entrySet()) {
-                        if (m.getKey().isRelay()){
-                            needrefresh=false;
+                        if (m.getKey().isRelay()) {
+                            needrefresh = false;
                             break;
                         }
                     }
-                    if (!needrefresh){
+                    if (!needrefresh) {
                         break;
                     }
                 }
 
-                if (needrefresh){
+                if (needrefresh) {
                     serverList.refreshAllRelay();
                 }
 
                 //put the subscription in list
                 Server.subscriptions.put(this.client, new Subscription(subscribeMessage, this.ClientAddress, secure));
 
-                SubscribeMessage forwarded = new SubscribeMessage(false,subscribeMessage.getId(),subscribeMessage.getResourceTemplate());
+                SubscribeMessage forwarded = new SubscribeMessage(false, subscribeMessage.getId(), subscribeMessage.getResourceTemplate());
                 serverList.doMessageRealy(gson.toJson(forwarded));
 
                 Server.logger.log(Level.FINE, "{0} : Resource subscribed!(relay=true)", this.ClientAddress);
@@ -230,8 +230,8 @@ public class WorkerThread extends Thread {
                 //block until user terminate.
                 String next;
 
-                while (true){
-                    if((next = this.input.readUTF())!=null) {
+                while (true) {
+                    if ((next = this.input.readUTF()) != null) {
                         break;
                     }
                 }
@@ -242,11 +242,11 @@ public class WorkerThread extends Thread {
 
                 int size = 0;
 
-                for (Map.Entry<SubscribeMessage,Integer> entry: subscription.getSubscribeMessage().entrySet()) {
-                    size+=entry.getValue();
+                for (Map.Entry<SubscribeMessage, Integer> entry : subscription.getSubscribeMessage().entrySet()) {
+                    size += entry.getValue();
                 }
 
-                JSON = getResultSizeJson((long)size);
+                JSON = getResultSizeJson((long) size);
 
                 this.output.writeUTF(JSON);
                 this.output.flush();
