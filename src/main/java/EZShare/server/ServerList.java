@@ -184,7 +184,7 @@ public class ServerList {
             socket.connect(new InetSocketAddress(target.getHostname(), target.getPort()), SERVER_TIMEOUT);
 
             DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
-            DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+            //DataInputStream inputStream = new DataInputStream(socket.getInputStream());
 
 
             //traverse all subscribers
@@ -218,7 +218,7 @@ public class ServerList {
 
             }
             relay.put(target, socket);
-            Server.logger.warning("relay connection opened " + target.toString());
+            Server.logger.info("relay connection opened " + target.toString());
 
         } catch (IOException e) {
             Server.logger.warning("IOException when subscribe relay to " + target.toString());
@@ -255,6 +255,7 @@ public class ServerList {
                         outputStream.writeUTF(JSON);
                         outputStream.flush();
 
+                        /*
                         String response = inputStream.readUTF();
 
                         if (response.contains("resultSize")) {
@@ -262,7 +263,7 @@ public class ServerList {
                                     " relayed to: " + target.toString() +
                                     " for " + subscription.getKey().getId());
                         }
-
+                        */
                     }
 
                 }
@@ -292,6 +293,7 @@ public class ServerList {
             for (Map.Entry<Host, Socket> entry : relay.entrySet()) {
                 DataOutputStream outputStream = new DataOutputStream(entry.getValue().getOutputStream());
 
+                entry.getValue().setSoTimeout(3000);
 
                 outputStream.writeUTF(JSON);
                 outputStream.flush();
@@ -301,6 +303,8 @@ public class ServerList {
 
         } catch (IOException e) {
             Server.logger.warning("IOException when subscribe relay: " + e.getMessage());
+            e.printStackTrace();
+            System.out.println("JSON : " + JSON);
         }
 
     }
