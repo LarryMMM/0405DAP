@@ -43,6 +43,8 @@ public class Subscription {
         for (Map.Entry<SubscribeMessage,Integer> entry: this.subscribeMessage.entrySet()) {
            if (entry.getKey().getId().equals(id)){
                this.subscribeMessage.remove(entry.getKey());
+               // Personally I think the spec is problematic
+               return;
            }
         }
     }

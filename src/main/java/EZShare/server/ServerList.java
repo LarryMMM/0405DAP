@@ -278,7 +278,7 @@ public class ServerList {
         }
     }
 
-    public synchronized void doMessageRealy(String JSON) {
+    public synchronized void doMessageRelay(String JSON) {
 
         ConcurrentHashMap<Host, Socket> relay;
 

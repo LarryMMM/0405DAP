@@ -10,7 +10,6 @@ import java.util.*;
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
 
-import javax.net.ssl.SSLSocket;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 
@@ -223,7 +222,7 @@ public class WorkerThread extends Thread {
                 Server.subscriptions.put(this.client, new Subscription(subscribeMessage, this.ClientAddress, secure));
 
                 SubscribeMessage forwarded = new SubscribeMessage(false, subscribeMessage.getId(), subscribeMessage.getResourceTemplate());
-                serverList.doMessageRealy(gson.toJson(forwarded));
+                serverList.doMessageRelay(gson.toJson(forwarded));
 
                 Server.logger.log(Level.FINE, "{0} : Resource subscribed!(relay=true)", this.ClientAddress);
 
@@ -236,7 +235,7 @@ public class WorkerThread extends Thread {
                     }
                 }
 
-                serverList.doMessageRealy(gson.toJson(new UnsubscribeMessage(subscribeMessage.getId())));
+                serverList.doMessageRelay(gson.toJson(new UnsubscribeMessage(subscribeMessage.getId())));
 
                 Subscription subscription = Server.subscriptions.get(this.client);
 
