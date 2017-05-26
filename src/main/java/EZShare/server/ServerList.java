@@ -288,9 +288,10 @@ public class ServerList {
             relay = Server.unsecure_relay;
         }
 
+
+
         try{
             for(Map.Entry<Host,Socket> entry: relay.entrySet()){
-                DataInputStream inputStream = new DataInputStream(entry.getValue().getInputStream());
                 DataOutputStream outputStream = new DataOutputStream(entry.getValue().getOutputStream());
 
 
@@ -302,6 +303,23 @@ public class ServerList {
 
         }catch (IOException e){
             Server.logger.warning("IOException when subscribe relay");
+        }
+
+    }
+
+    public synchronized void refreshAllRelay(){
+        ConcurrentHashMap<Host, Socket> relay;
+
+        if (secure) {
+            relay = Server.secure_relay;
+        } else {
+            relay = Server.unsecure_relay;
+        }
+
+        relay = new ConcurrentHashMap<>();
+
+        for (Host h: this.serverList) {
+            openSubscribeRelay(h);
         }
 
     }

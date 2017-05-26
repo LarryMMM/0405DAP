@@ -22,7 +22,6 @@ public class WorkerThread extends Thread {
     private Socket client;
     private FileList fileList;
     private ServerList serverList;
-    private ConcurrentHashMap<Host, Socket> relay;
 
     private boolean secure = false;
     private DataOutputStream output;
@@ -50,22 +49,18 @@ public class WorkerThread extends Thread {
     @Override
     public void run() {
         try {
-            /* Socket opened. */
 
+            /* Socket opened. */
             this.ClientAddress = client.getRemoteSocketAddress().toString();
             this.input = new DataInputStream(client.getInputStream());
             this.output = new DataOutputStream(client.getOutputStream());
 
-            if (secure) {
-                this.relay = Server.secure_relay;
-            } else {
-                this.relay = Server.unsecure_relay;
-            }
-
             Server.logger.log(Level.INFO, "{0} : Connected!", this.ClientAddress);
 
             /* Get input data. Remove \0 in order to prevent crashing. */
-            String inputJson = input.readUTF().replace("\0", "");
+            String inputJson = input.readUTF();
+
+            inputJson = inputJson.replace("\0","");
 
             /* Process and get output data. */
             List<String> outputJsons = reception(inputJson);
@@ -177,11 +172,14 @@ public class WorkerThread extends Thread {
                             if (next.contains("UNSUBSCRIBE")) {
                                 //unsub for this subscription
                                 UnsubscribeMessage unsubscribeMessage = gson.fromJson(next, UnsubscribeMessage.class);
+                                Server.subscriptions.get(this.client).removeSubscribeMessage(unsubscribeMessage.getId());
                                 String resultsize = getResultSizeJson((long) Server.subscriptions.get(this.client).getResultSize(unsubscribeMessage.getId()));
                                 this.output.writeUTF(resultsize);
                                 this.output.flush();
                                 Server.logger.log(Level.INFO, "{0} : Terminating subscription " + unsubscribeMessage.getId() + " with resultSize:" + resultsize, this.ClientAddress);
-                                break;
+                                if (Server.subscriptions.get(this.client).getSubscribeMessage().size()==0){
+                                    break;
+                                }
 
                             } else if (next.contains("SUBSCRIBE")) {
                                 SubscribeMessage newsubscribe = gson.fromJson(next, SubscribeMessage.class);
@@ -201,6 +199,25 @@ public class WorkerThread extends Thread {
 
                 this.output.writeUTF(response);
                 this.output.flush();
+
+                boolean needrefresh = true;
+
+                for (Map.Entry<Socket, Subscription> entry: Server.subscriptions.entrySet()){
+                    ConcurrentHashMap<SubscribeMessage, Integer> sms = entry.getValue().getSubscribeMessage();
+                    for (Map.Entry<SubscribeMessage, Integer> m : sms.entrySet()) {
+                        if (m.getKey().isRelay()){
+                            needrefresh=false;
+                            break;
+                        }
+                    }
+                    if (!needrefresh){
+                        break;
+                    }
+                }
+
+                if (needrefresh){
+                    serverList.refreshAllRelay();
+                }
 
                 //put the subscription in list
                 Server.subscriptions.put(this.client, new Subscription(subscribeMessage, this.ClientAddress, secure));
@@ -234,6 +251,7 @@ public class WorkerThread extends Thread {
                 this.output.writeUTF(JSON);
                 this.output.flush();
 
+                Server.subscriptions.remove(this.client);
 
             }
 
