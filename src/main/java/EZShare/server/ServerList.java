@@ -196,7 +196,10 @@ public class ServerList {
                 for (Map.Entry<SubscribeMessage, Integer> subscription:messages.entrySet()){
                     //if this message have relay=true
                     if (subscription.getKey().isRelay()){
-                        String JSON = gson.toJson(subscription.getKey(),SubscribeMessage.class);
+
+                        SubscribeMessage forwarded = new SubscribeMessage(false,subscription.getKey().getId(),subscription.getKey().getResourceTemplate());
+
+                        String JSON = gson.toJson(forwarded,SubscribeMessage.class);
                         outputStream.writeUTF(JSON);
                         outputStream.flush();
 
@@ -215,7 +218,7 @@ public class ServerList {
 
             }
             relay.put(target,socket);
-            Server.logger.warning("connection opened "+target.toString());
+            Server.logger.warning("relay connection opened "+target.toString());
 
         } catch (IOException e){
             Server.logger.warning("IOException when subscribe relay to "+target.toString());
