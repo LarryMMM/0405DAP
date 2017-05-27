@@ -511,24 +511,6 @@ public class WorkerThread extends Thread {
         }
     }
 
-    /**
-     * Examine input is available without blocking(If java.nio not applicable.)
-     *
-     * @return Whether there is data available.
-     */
-    public boolean isTerminated() {
-
-        try {
-            this.client.setSoTimeout(1);
-            String unsub = this.input.readUTF();
-            this.client.setSoTimeout(3000);
-            return true;
-        } catch (IOException e) {
-            return false;
-        }
-
-    }
-
     private List<ResourceTemplate> doSingleQueryRelay(Host host, QueryMessage queryMessage) {
 
         List<ResourceTemplate> result = new ArrayList<>();
