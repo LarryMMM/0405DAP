@@ -62,7 +62,7 @@ public class LeafNode {
     public static int PORT = 3780;
     public static int SPORT = 3781;
     public static final int MAX_THREAD_COUNT = 50;
-    public static long EXCHANGE_PERIOD = 600000;
+//    public static long EXCHANGE_PERIOD = 600000;
     public static long INTERVAL = 1000;
     public static String SECRET = random(26);
 
@@ -100,13 +100,17 @@ public class LeafNode {
     private static Options commandOptions() {
         //Build up command line options
         Options options = new Options();
+
+        //server command
         options.addOption("advertisedhostname", true, "advertised hostname");
         options.addOption("connectionintervallimit", true, "connection interval limit in seconds");
-        options.addOption("exchangeinterval", true, "exchange interval in seconds");
+//        options.addOption("exchangeinterval", true, "exchange interval in seconds");
         options.addOption("port", true, "server port, an integer");
         options.addOption("secret", true, "secret");
         options.addOption("debug", false, "print debug information");
-        options.addOption("sport", true, "server secure port, an integer");
+//        options.addOption("sport", true, "server secure port, an integer");
+
+        //client command
         options.addOption("id", true, "set the ID for subscribe request");
         options.addOption("subscribe", false, "subscribe resource from server");
         options.addOption("secure", false, "set true to initiate secure connection");
@@ -129,6 +133,9 @@ public class LeafNode {
         options.addOption("uri", true, "resource URI");
         options.addOption("help", false, "help");
 
+        options.addOption("receiver",true,"act as server");
+        options.addOption("requester",true,"act as client");
+        options.addOption("isUltraNode",false,"set as ultra node");
         //parse command line arguments
         return options;
     }
@@ -160,64 +167,85 @@ public class LeafNode {
     }
 
     public static void main(String[] args) {
-        logger.info("Starting the EZShare Server");
-
-        /* Timer running as a daemon thread schedules the regular EXCHANGE command. */
-        Timer timer = new Timer(true);
-        TimerTask regularExchangeTask = new TimerTask() {
-            @Override
-            public void run() {
-                serverList.regularExchange();
-            }
-        };
-        TimerTask secure_regularExchangeTask = new TimerTask() {
-            @Override
-            public void run() {
-                secure_severList.regularExchange();
-            }
-        };
-        timer.schedule(regularExchangeTask, 0, EXCHANGE_PERIOD);
-        timer.schedule(secure_regularExchangeTask, 1000, EXCHANGE_PERIOD);
-
+//        /* Timer running as a daemon thread schedules the regular EXCHANGE command. */
+//        Timer timer = new Timer(true);
+//        TimerTask regularExchangeTask = new TimerTask() {
+//            @Override
+//            public void run() {
+//                serverList.regularExchange();
+//            }
+//        };
+//        TimerTask secure_regularExchangeTask = new TimerTask() {
+//            @Override
+//            public void run() {
+//                secure_severList.regularExchange();
+//            }
+//        };
+//        timer.schedule(regularExchangeTask, 0, EXCHANGE_PERIOD);
+//        timer.schedule(secure_regularExchangeTask, 1000, EXCHANGE_PERIOD);
+//no regular exchange supported@larry
         /* Command line processing */
         CommandLineParser parser = new DefaultParser();
         Options options = commandOptions();
+        try {
+            // parse command line arguments
+            CommandLine line = parser.parse(options, args);
+            if (line.hasOption("receiver") && !line.hasOption("requester")){
+                startServerMode(line);
+            }else if (line.hasOption("requester")){
+
+            }else{
+                System.err.println("Not valid command! Receiver or Requester has to be provided!");
+            }
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+
 
         try {
             // parse command line arguments
             CommandLine line = parser.parse(options, args);
+            if (line.hasOption("receiver")){
+                logger.info("Starting the EZShare Server");
+                if (line.hasOption("advertisedhostname")) {
+                    HOST = line.getOptionValue("advertisedhostname");
+                }
+                if (line.hasOption("connectionintervallimit")) {
+                    INTERVAL = Integer.parseInt(line.getOptionValue("connectionintervallimit"));
+                }
+//                if (line.hasOption("exchangeinterval")) {
+//                    EXCHANGE_PERIOD = Integer.parseInt(line.getOptionValue("exchangeinterval"));
+//                }
+//no regular exchange supported@larry
+                if (line.hasOption("port")) {
+                    PORT = Integer.parseInt(line.getOptionValue("port"));
+                }
+//                if (line.hasOption("sport")) {
+//                    SPORT = Integer.parseInt(line.getOptionValue("sport"));
+//                }
+//only rsa port is supported@larry
+                if (line.hasOption("secret")) {
+                    SECRET = line.getOptionValue("secret");
+                }
+                // if debug not toggle, cancel all logs.
+                if (!line.hasOption("debug")) {
+                    logger.setFilter((LogRecord record) -> (false));
+                } else {
+                    logger.info("setting debug on");
+                }
+                logger.info("Using advertised hostname: " + HOST);
+                logger.info(String.valueOf("Using connection interval limit: " + INTERVAL));
+//                logger.info(String.valueOf("Using exchange interval period: " + EXCHANGE_PERIOD));
+                logger.info("Using secret: " + SECRET);
+                //start server socket and listen
+                startServerMode();
+            }else if(line.hasOption("requester")){
 
-            if (line.hasOption("advertisedhostname")) {
-                HOST = line.getOptionValue("advertisedhostname");
-            }
-            if (line.hasOption("connectionintervallimit")) {
-                INTERVAL = Integer.parseInt(line.getOptionValue("connectionintervallimit"));
-            }
-            if (line.hasOption("exchangeinterval")) {
-                EXCHANGE_PERIOD = Integer.parseInt(line.getOptionValue("exchangeinterval"));
-            }
-            if (line.hasOption("port")) {
-                PORT = Integer.parseInt(line.getOptionValue("port"));
-            }
-            if (line.hasOption("sport")) {
-                SPORT = Integer.parseInt(line.getOptionValue("sport"));
-            }
-
-            if (line.hasOption("secret")) {
-                SECRET = line.getOptionValue("secret");
-            }
-            // if debug not toggle, cancel all logs.
-            if (!line.hasOption("debug")) {
-                logger.setFilter((LogRecord record) -> (false));
-            } else {
-                logger.info("setting debug on");
+            }else{
+                System.err.println("Not valid command! Receiver or Requester has to be provided!");
             }
 
 
-            logger.info("Using advertised hostname: " + HOST);
-            logger.info(String.valueOf("Using connection interval limit: " + INTERVAL));
-            logger.info(String.valueOf("Using exchange interval period: " + EXCHANGE_PERIOD));
-            logger.info("Using secret: " + SECRET);
 
 
 
@@ -249,50 +277,10 @@ public class LeafNode {
             logger.info("Bound to port " + PORT);
             logger.info("Bound to sport " + SPORT);
             
-            /* Create ServerSocket */
-            ServerSocketFactory factory = ServerSocketFactory.getDefault();
-            ServerSocket serverSocket = factory.createServerSocket(PORT);
-            logger.info("ServerSocket initialized.");
-
-            /* Create SSLServerSocket */
-            SSLServerSocket sslServerSocket = (SSLServerSocket) LeafNode.context.getServerSocketFactory().createServerSocket(SPORT);
-            sslServerSocket.setNeedClientAuth(true);
-            logger.info("SSLServerSocket initialized.");
 
 
-            logger.info("Waiting for client connection..");
 
 
-            /* Start listening */
-            Thread plainSocket = new Thread(() -> {
-                while (true) {
-                    try {
-                        Socket client = serverSocket.accept();
-
-                        /* Upper bound of simultaneous connections */
-                        String clientIP = client.getInetAddress().getHostAddress();
-                        long currentTime = System.currentTimeMillis();
-                        if (!intervalLimit.containsKey(clientIP) || (currentTime - intervalLimit.get(clientIP) > INTERVAL)) {
-                            /* Update the time record */
-                            intervalLimit.put(clientIP, currentTime);
-
-                            /* Assign a worker thread for this socket. */
-                            try {
-                                LeafNode.threadPool.submit(new WorkerThread(client, fileList, serverList, false));
-                            } catch (IOException e) {
-                                logger.log(Level.WARNING, "{0} cannot create stream", client.getRemoteSocketAddress().toString());
-                                client.close();
-                            }
-
-                        } else {
-                    /* Violation */
-                            client.close();
-                        }
-                    } catch (IOException ex) {
-                        logger.warning(ex.getMessage());
-                    }
-                }
-            });
 
             Thread sslSocket = new Thread(() -> {
                 while (true) {
@@ -521,7 +509,90 @@ public class LeafNode {
         }
     }
 
+    private static void startServerMode(CommandLine cmdLine){
+        try{
+            if (cmdLine.hasOption("advertisedhostname")) {
+                HOST = cmdLine.getOptionValue("advertisedhostname");
+            }
+            if (cmdLine.hasOption("connectionintervallimit")) {
+                INTERVAL = Integer.parseInt(cmdLine.getOptionValue("connectionintervallimit"));
+            }
+//            if (cmdLine.hasOption("exchangeinterval")) {
+//                EXCHANGE_PERIOD = Integer.parseInt(cmdLine.getOptionValue("exchangeinterval"));
+//            }
+            if (cmdLine.hasOption("port")) {
+                PORT = Integer.parseInt(cmdLine.getOptionValue("port"));
+            }
+//            if (line.hasOption("sport")) {
+//                SPORT = Integer.parseInt(line.getOptionValue("sport"));
+//            }
+            if (cmdLine.hasOption("secret")) {
+                SECRET = cmdLine.getOptionValue("secret");
+            }
+            // if debug not toggle, cancel all logs.
+            if (!cmdLine.hasOption("debug")) {
+                logger.setFilter((LogRecord record) -> (false));
+            } else {
+                logger.info("setting debug on");
+            }
+            logger.info("Using advertised hostname: " + HOST);
+            logger.info(String.valueOf("Using connection interval limit: " + INTERVAL));
+//            logger.info(String.valueOf("Using exchange interval period: " + EXCHANGE_PERIOD));
+            logger.info("Using secret: " + SECRET);
 
+            /* Create ServerSocket */
+            ServerSocketFactory factory = ServerSocketFactory.getDefault();
+            ServerSocket serverSocket = factory.createServerSocket(PORT);
+            logger.info("ServerSocket initialized.");
+            //encrypt msg with rsa@larry
+
+            logger.info("Waiting for client connection..");
+            /* Start listening */
+            Thread plainSocket = new Thread(() -> {
+                while (true) {
+                    try {
+                        Socket client = serverSocket.accept();
+                        /* Upper bound of simultaneous connections */
+                        String clientIP = client.getInetAddress().getHostAddress();
+                        long currentTime = System.currentTimeMillis();
+                        if (!intervalLimit.containsKey(clientIP) || (currentTime - intervalLimit.get(clientIP) > INTERVAL)) {
+                            /* Update the time record */
+                            intervalLimit.put(clientIP, currentTime);
+                            /* Assign a worker thread for this socket. */
+                            try {
+                                LeafNode.threadPool.submit(new WorkerThread(client, fileList, serverList, false));
+                            } catch (IOException e) {
+                                logger.log(Level.WARNING, "{0} cannot create stream", client.getRemoteSocketAddress().toString());
+                                client.close();
+                            }
+
+                        } else {
+                            /* Violation */
+                            client.close();
+                        }
+                    } catch (IOException ex) {
+                        logger.warning(ex.getMessage());
+                    }
+                }
+            });
+            Thread listener = new Thread(() -> {
+                while (true){
+                    for (Map.Entry<Host,Socket> entry: Server.unsecure_relay.entrySet()) {
+                        forward(entry.getValue());
+                    }
+                    for (Map.Entry<Host,Socket> entry: Server.secure_relay.entrySet()) {
+                        forward(entry.getValue());
+                    }
+                }
+
+            });
+            plainSocket.start();
+            listener.start();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
 
     private static final String download_path = "Downloads/";
     private static final int TIME_OUT = 30000;
