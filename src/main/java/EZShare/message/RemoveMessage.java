@@ -24,6 +24,7 @@ public class RemoveMessage extends Message{
     @Override
     public boolean isValid() {
         return resource.isValid()&&(resource.isValidUri()||resource.isValidFile());
+        //owner not null or "*";
     }
 
 }

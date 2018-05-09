@@ -1,7 +1,4 @@
 package EZShare;
-
-import sun.nio.cs.UTF_32;
-
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
@@ -19,65 +16,84 @@ import java.util.Base64;
 
 
 public class RSA {
+//    public static void main(String[] args) {
+//        //RSA KEY GENERATION
+//        ArrayList<Key> keyPair= getKeyPair("RSA");
+//        System.err.println("Public key generated   :"+ keyPair.get(0));//public key
+//        System.err.println("Private key generated   :"+ keyPair.get(1));//private key
+//
+//        //RSA KEY SAVE
+//        saveKeyPair(keyPair,"LarryKeyPairTest");
+//
+//        //LOAD RSA KEY
+//        ArrayList<Key> keyPairLoad= loadKeyPair("LarryKeyPairTest","RSA");
+//        System.err.println("Public Key Loaded: " + keyPairLoad.get(0));
+//        System.err.println("Private Key Loaded: " + keyPairLoad.get(1));
+//
+//        //ENCRYPT MESSAGE
+//        byte[] cipherMsg = new byte[0];
+//        try {
+//            cipherMsg = encryptMessage((PublicKey) keyPairLoad.get(0),"RSA/ECB/PKCS1Padding","larry is genius");
+//        } catch (NoSuchPaddingException e) {
+//            e.printStackTrace();
+//        } catch (NoSuchAlgorithmException e) {
+//            e.printStackTrace();
+//        } catch (InvalidKeyException e) {
+//            e.printStackTrace();
+//        } catch (BadPaddingException e) {
+//            e.printStackTrace();
+//        } catch (IllegalBlockSizeException e) {
+//            e.printStackTrace();
+//        }
+//        //DECRYPT MESSAGE
+//        String Msg = null;
+//        try {
+//            Msg = decryptMessage((PrivateKey)keyPairLoad.get(1),"RSA/ECB/PKCS1Padding",cipherMsg);
+//        } catch (NoSuchPaddingException e) {
+//            e.printStackTrace();
+//        } catch (NoSuchAlgorithmException e) {
+//            e.printStackTrace();
+//        } catch (InvalidKeyException e) {
+//            e.printStackTrace();
+//        } catch (BadPaddingException e) {
+//            e.printStackTrace();
+//        } catch (IllegalBlockSizeException e) {
+//            e.printStackTrace();
+//        }
+//        System.err.println("cipherMessage :" + Base64.getEncoder().encodeToString(cipherMsg));
+//        System.err.println("plainMessage  :"+ Msg);
+//        //RSA KEY SAVE AS TEXT
+//        saveKeyPairText(keyPair,"LarryKeyPairTextTest");
+//
+//        //GENERATE RSA SIGNATURE
+//        getSignature((PrivateKey) keyPairLoad.get(1),"SHA256withRSA", "LarrySignatureTest.txt");
+//
+//        //VERIFY RSA SIGNATURE
+//        boolean verify = verifySignature((PublicKey)keyPairLoad.get(0),"SHA256withRSA",
+//                "LarrySignatureTest.txt","signed"+ "LarrySignatureTest.txt");
+//        System.err.println(verify);
+//    }
+    private PublicKey pubKey;
+    private PrivateKey pvtKey;
+    private String id;
 
-    public static void main(String[] args) {
-        //RSA KEY GENERATION
-        ArrayList<Key> keyPair= getKeyPair("RSA");
-        System.err.println("Public key generated   :"+ keyPair.get(0));//public key
-        System.err.println("Private key generated   :"+ keyPair.get(1));//private key
-
-        //RSA KEY SAVE
-        saveKeyPair(keyPair,"LarryKeyPairTest");
-
-        //LOAD RSA KEY
-        ArrayList<Key> keyPairLoad= loadKeyPair("LarryKeyPairTest","RSA");
-        System.err.println("Public Key Loaded: " + keyPairLoad.get(0));
-        System.err.println("Private Key Loaded: " + keyPairLoad.get(1));
-
-        //ENCRYPT MESSAGE
-        byte[] cipherMsg = new byte[0];
-        try {
-            cipherMsg = encryptMessage((PublicKey) keyPairLoad.get(0),"RSA/ECB/PKCS1Padding","testEncyption");
-        } catch (NoSuchPaddingException e) {
-            e.printStackTrace();
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        } catch (InvalidKeyException e) {
-            e.printStackTrace();
-        } catch (BadPaddingException e) {
-            e.printStackTrace();
-        } catch (IllegalBlockSizeException e) {
-            e.printStackTrace();
-        }
-        //DECRYPT MESSAGE
-        String Msg = null;
-        try {
-            Msg = decryptMessage((PrivateKey)keyPairLoad.get(1),"RSA/ECB/PKCS1Padding",cipherMsg);
-        } catch (NoSuchPaddingException e) {
-            e.printStackTrace();
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        } catch (InvalidKeyException e) {
-            e.printStackTrace();
-        } catch (BadPaddingException e) {
-            e.printStackTrace();
-        } catch (IllegalBlockSizeException e) {
-            e.printStackTrace();
-        }
-        System.err.println("cipherMessage :" + Base64.getEncoder().encodeToString(cipherMsg));
-        System.err.println("plainMessage  :"+ Msg);
-        //RSA KEY SAVE AS TEXT
-        saveKeyPairText(keyPair,"LarryKeyPairTextTest");
-
-        //GENERATE RSA SIGNATURE
-        getSignature((PrivateKey) keyPairLoad.get(1),"SHA256withRSA", "LarrySignatureTest.txt");
-
-        //VERIFY RSA SIGNATURE
-        boolean verify = verifySignature((PublicKey)keyPairLoad.get(0),"SHA256withRSA",
-                "LarrySignatureTest.txt","signed"+ "LarrySignatureTest.txt");
-        System.err.println(verify);
+    public String getID(){
+        return this.id;
+    }
+    public PublicKey getPublicKey(){ return this.pubKey; }
+    public PrivateKey getPrivateKey(){return this.pvtKey;}
+    public RSA(){
+        this.pubKey = (PublicKey) getKeyPair("RSA").get(0);
+        this.pvtKey = (PrivateKey)getKeyPair("RSA").get(1);
     }
 
+    public RSA(String clientId){
+        //RSA KEY GENERATION
+        this.pubKey = (PublicKey) getKeyPair("RSA").get(0);
+        this.pvtKey = (PrivateKey)getKeyPair("RSA").get(1);
+        this.id = clientId;
+        saveKeyPair(getKeyPair("RSA"),id);
+    }
     private static ArrayList<Key> getKeyPair(String algorithm){
         try {
             ArrayList<Key> keyPair = new ArrayList<>();
@@ -97,7 +113,7 @@ public class RSA {
             return null;
         }
     }
-
+//create RSA KEY
     private static void saveKeyPair(ArrayList<Key> keyPair,String keyName){
         try{
             Key pub = keyPair.get(0);
@@ -119,7 +135,7 @@ public class RSA {
             e.printStackTrace();
         }
     }
-
+//save RSA KEY
     private static ArrayList<Key> loadKeyPair(String keyName,String algorithm){
         try{
             ArrayList<Key> keyPair = new ArrayList<>();
@@ -148,20 +164,20 @@ public class RSA {
         }
         return null;
     }
-
-    private static byte[] encryptMessage(PublicKey pubKey,String algorithm, String message) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
+//load RSA KEY
+    public static byte[] encryptMessage(PublicKey pubKey,String algorithm, String message) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
         Cipher encryptCipher = Cipher.getInstance(algorithm);
         encryptCipher.init(Cipher.ENCRYPT_MODE,pubKey);
         return encryptCipher.doFinal(message.getBytes());
 //            System.err.println(cipherText);
     }
-
-    private static String decryptMessage(PrivateKey pvtKey,String algorithm,byte[] cipherMessage) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
+//encrypt message
+    public static String decryptMessage(PrivateKey pvtKey,String algorithm,byte[] cipherMessage) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
         Cipher decryptCipher = Cipher.getInstance(algorithm);
         decryptCipher.init(Cipher.PRIVATE_KEY, pvtKey);
         return new String(decryptCipher.doFinal(cipherMessage));
     }
-
+//decrypt message
     private static void saveKeyPairText(ArrayList<Key> keyPair,String keyNameText){
         try {
             PublicKey pubKey = (PublicKey) keyPair.get(0);
@@ -183,8 +199,8 @@ public class RSA {
             e.printStackTrace();
         }
     }
-
-    private static void getSignature(PrivateKey pvtKey,String algorithm,String fileName){
+//save RSA KEY as txt
+    public static void getSignature(PrivateKey pvtKey,String algorithm,String fileName){
         try {
             Signature sign = Signature.getInstance(algorithm);
             sign.initSign(pvtKey);
@@ -209,8 +225,8 @@ public class RSA {
             e.printStackTrace();
         }
     }
-
-    private static boolean verifySignature(PublicKey pubKey,String algorithm,String unsignedFileName,String signedFileName){
+//create signature
+    public static boolean verifySignature(PublicKey pubKey,String algorithm,String unsignedFileName,String signedFileName){
         try {
             Signature sign = Signature.getInstance(algorithm);
             sign.initVerify(pubKey);
@@ -234,6 +250,6 @@ public class RSA {
         }
         return false;
     }
-
+//verify signature
 
 }
