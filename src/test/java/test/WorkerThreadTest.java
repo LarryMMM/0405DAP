@@ -1,6 +1,6 @@
 package test;
 
-import EZShare.Server;
+import EZShare.Nodes;
 import EZShare.server.FileList;
 import EZShare.server.ServerList;
 import EZShare.server.WorkerThread;
@@ -25,11 +25,12 @@ public class WorkerThreadTest {
     protected List<String> outputJsons = null;
 
     protected void refreshWorkerThread() {
-        try {
-            w = new WorkerThread(new Socket(), new FileList(), new ServerList(true), false);
-        } catch (IOException e) {
-            Assert.fail(e.getMessage());
-        }
+//        try {
+//            w = new WorkerThread(new Socket(), new FileList(), new ServerList(true), false,true);
+//        } catch (IOException e) {
+//            Assert.fail(e.getMessage());
+//        }
+        w = new WorkerThread(new Socket(), new FileList(), new ServerList(true), false,true);
     }
     
     protected List<String> receptionTest(String inputFileName) throws IOException {
@@ -43,7 +44,7 @@ public class WorkerThreadTest {
         return w.reception(json);
     }
     
-    protected List<String> receptionShareOrFetchTest(String inputFileName, String filePath, String secret) throws IOException {
+    protected List<String> receptionShareOrFetchTest(String inputFileName, String filePath) throws IOException {
         BufferedReader br = new BufferedReader(new FileReader(System.getProperty("user.dir") + "/src/test/java/test/jsons/" + inputFileName));
         String json = "";
         for (String line = br.readLine(); line != null; line = br.readLine()) {
@@ -51,7 +52,6 @@ public class WorkerThreadTest {
             json += '\n';
         }
 
-        json = json.replace("abcdefghijklmnopqrstuvwxyz0123456789", secret);
         json = json.replace("file:///", filePath);
         
         System.out.println(json);
@@ -285,7 +285,7 @@ public class WorkerThreadTest {
     public void shareSuccess() {
        try {
             refreshWorkerThread();
-            outputJsons = receptionShareOrFetchTest("ShareSuccess", existingFilePath, Server.SECRET);
+            outputJsons = receptionShareOrFetchTest("ShareSuccess", existingFilePath);
             checkIndexContentAndDisplay(0, "success");
         } catch (IOException e) {
             Assert.fail(e.getMessage());
@@ -296,7 +296,7 @@ public class WorkerThreadTest {
     public void shareIncorrectSecret() {
        try {
             refreshWorkerThread();
-            outputJsons = receptionShareOrFetchTest("ShareIncorrectSecret", existingFilePath, "9527");
+            outputJsons = receptionShareOrFetchTest("ShareIncorrectSecret", existingFilePath);
             checkIndexContentAndDisplay(0, "incorrect secret");
         } catch (IOException e) {
             Assert.fail(e.getMessage());
@@ -307,7 +307,7 @@ public class WorkerThreadTest {
     public void shareInvalid() {
        try {
             refreshWorkerThread();
-            outputJsons = receptionShareOrFetchTest("ShareIncorrectSecret", "http://User", Server.SECRET);
+            outputJsons = receptionShareOrFetchTest("ShareIncorrectSecret", "http://User");
             checkIndexContentAndDisplay(0, "invalid resource");
         } catch (IOException e) {
             Assert.fail(e.getMessage());
@@ -318,7 +318,7 @@ public class WorkerThreadTest {
     public void shareMissingResource() {
        try {
             refreshWorkerThread();
-            outputJsons = receptionShareOrFetchTest("ShareMissingResource", "", Server.SECRET);
+            outputJsons = receptionShareOrFetchTest("ShareMissingResource", "");
             checkIndexContentAndDisplay(0, "missing resource and/or secret");
         } catch (IOException e) {
             Assert.fail(e.getMessage());
@@ -329,7 +329,7 @@ public class WorkerThreadTest {
     public void shareRulesBroken() {
        try {
             refreshWorkerThread();
-            outputJsons = receptionShareOrFetchTest("ShareRulesBroken", existingFilePath + "f", Server.SECRET);
+            outputJsons = receptionShareOrFetchTest("ShareRulesBroken", existingFilePath + "f");
             checkIndexContentAndDisplay(0, "cannot share resource");
         } catch (IOException e) {
             Assert.fail(e.getMessage());
@@ -344,9 +344,9 @@ public class WorkerThreadTest {
        try {
             refreshWorkerThread();
             /* Prepare a file to be fetched */
-            receptionShareOrFetchTest("ShareSuccess", existingFilePath, Server.SECRET);
+            receptionShareOrFetchTest("ShareSuccess", existingFilePath);
             /* Fetch it! */
-            outputJsons = receptionShareOrFetchTest("FetchSuccess", existingFilePath, "何と無く");
+            outputJsons = receptionShareOrFetchTest("FetchSuccess", existingFilePath);
             checkIndexContentAndDisplay(2, existingFilePath);
             checkIndexContentAndDisplay(3, "\"resultSize\":1");
         } catch (IOException e) {
@@ -381,9 +381,9 @@ public class WorkerThreadTest {
        try {
             refreshWorkerThread();
             /* Prepare a similar file, but not to be fetched */
-            receptionShareOrFetchTest("ShareSuccess", existingFilePath, Server.SECRET);
+            receptionShareOrFetchTest("ShareSuccess", existingFilePath);
             /* Fetch it! */
-            outputJsons = receptionShareOrFetchTest("FetchNoMatchedFile", existingFilePath + "f", "何と無く");
+            outputJsons = receptionShareOrFetchTest("FetchNoMatchedFile", existingFilePath + "f");
             checkIndexContentAndDisplay(1, "\"resultSize\":0");
         } catch (IOException e) {
             Assert.fail(e.getMessage());

@@ -1,10 +1,9 @@
 package EZShare.server;
 
-import EZShare.Server;
+import EZShare.Nodes;
 import EZShare.message.*;
 import com.google.gson.Gson;
 
-import javax.net.ssl.SSLSocket;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -28,21 +27,14 @@ public class ServerList {
 
     private boolean secure;
 
-    public static final int SERVER_TIMEOUT = (int) Server.EXCHANGE_PERIOD / 2;
+    public static final int SERVER_TIMEOUT = (int) Nodes.EXCHANGE_PERIOD / 2;
 
     private final List<Host> serverList = new ArrayList<>();
 
 
-    public ServerList(boolean seucre) {
-        this.secure = seucre;
+    public ServerList(boolean secure) {
+        this.secure = secure;
     }
-    /*
-    public ServerList() {
-        // Add a default dummy host (which is of course not available)
-        Host host = new Host("localhorse", 9527);
-        this.serverList.add(host);
-    }
-    */
 
     public synchronized List<Host> getServerList() {
         return serverList;
@@ -56,77 +48,18 @@ public class ServerList {
                 Discard host if (1) already in the list (2) is a local address
             */
             if (!containsHost(inputHost) &&
-                    !(isMyIpAddress(inputHost.getHostname()) && (inputHost.getPort() == Server.PORT || inputHost.getPort() == Server.SPORT))) {
+                    !(isMyIpAddress(inputHost.getHostname()) && (inputHost.getPort() == Nodes.PORT ))) {
 
                 openSubscribeRelay(inputHost);
-
+//                Nodes.logger.info("inputHost:"+inputHost);
                 serverList.add(inputHost);
-
+//                Nodes.logger.info("ENDinputHost:"+inputHost);
                 ++addCount;
             }
         }
         return addCount;
     }
-
-    public synchronized void regularExchange() {
-
-        if (serverList.size() > 0) {
-            int randomIndex = ThreadLocalRandom.current().nextInt(0, serverList.size());
-            Host randomHost = serverList.get(randomIndex);
-
-            Socket socket = null;
-
-            try {
-                // Need SSL!!!
-                if (secure) {
-                    socket = Server.context.getSocketFactory().createSocket();
-                } else {
-                    socket = new Socket();
-                }
-                /* Set timeout for connection establishment, throwing ConnectException */
-                socket.connect(new InetSocketAddress(randomHost.getHostname(), randomHost.getPort()), SERVER_TIMEOUT);
-
-
-                /* Set timeout for read() (also readUTF()!), throwing SocketTimeoutException */
-                socket.setSoTimeout(SERVER_TIMEOUT);
-
-                DataInputStream input = new DataInputStream(socket.getInputStream());
-                DataOutputStream output = new DataOutputStream(socket.getOutputStream());
-
-                Server.logger.fine("Regular EXCHANGE to " + socket.getRemoteSocketAddress());
-
-                ExchangeMessage exchangeMessage = new ExchangeMessage(serverList);
-
-                String JSON = new Gson().toJson(exchangeMessage);
-                output.writeUTF(JSON);
-                output.flush();
-
-                String response = input.readUTF();
-
-                if (response.contains("error"))
-                    Server.logger.warning("RECEIVED : " + response);
-                if (response.contains("success"))
-                    Server.logger.fine("RECEIVED : " + response);
-            } catch (ConnectException ex) {
-                Server.logger.warning(randomHost.toString() + " connection timeout");
-                removeServer(randomHost, secure);
-            } catch (SocketTimeoutException ex) {
-                Server.logger.warning(randomHost.toString() + " readUTF() timeout");
-                removeServer(randomHost, secure);
-            } catch (IOException ex) {
-                /* Unclassified exception */
-                Server.logger.warning(randomHost.toString() + " IOException");
-                removeServer(randomHost, secure);
-            } finally {
-                try {
-                    if (socket != null)
-                        socket.close();
-                } catch (IOException e) {
-                    Server.logger.warning("IOException! Disconnect!");
-                }
-            }
-        }
-    }
+/*no regular exchange*/
 
     public synchronized void removeServer(Host inputHost, boolean secure) {
 
@@ -169,59 +102,36 @@ public class ServerList {
 
 
     public void openSubscribeRelay(Host target) {
-        Socket socket = null;
         ConcurrentHashMap<Host, Socket> relay;
-
         try {
-            if (secure) {
-                socket = Server.context.getSocketFactory().createSocket();
-                relay = Server.secure_relay;
-            } else {
-                socket = new Socket();
-                relay = Server.unsecure_relay;
-            }
-                /* Set timeout for connection establishment, throwing ConnectException */
+            Socket socket = new Socket();
+            relay = Nodes.unsecure_relay;
+            /* Set timeout for connection establishment, throwing ConnectException */
             socket.connect(new InetSocketAddress(target.getHostname(), target.getPort()), SERVER_TIMEOUT);
 
             DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
             //DataInputStream inputStream = new DataInputStream(socket.getInputStream());
 
-
             //traverse all subscribers
-            for (Map.Entry<Socket, Subscription> subscriber : Server.subscriptions.entrySet()) {
+            for (Map.Entry<Socket, Subscription> subscriber : Nodes.subscriptions.entrySet()) {
                 //get all subscribe message of this subscriber
                 ConcurrentHashMap<SubscribeMessage, Integer> messages = subscriber.getValue().getSubscribeMessage();
                 for (Map.Entry<SubscribeMessage, Integer> subscription : messages.entrySet()) {
                     //if this message have relay=true
                     if (subscription.getKey().isRelay()) {
-
-                        SubscribeMessage forwarded = new SubscribeMessage(false, subscription.getKey().getId(), subscription.getKey().getResourceTemplate());
+                        SubscribeMessage forwarded = new SubscribeMessage(false, subscription.getKey().getId(),
+                                subscription.getKey().getResourceTemplate());
 
                         String JSON = gson.toJson(forwarded, SubscribeMessage.class);
                         outputStream.writeUTF(JSON);
                         outputStream.flush();
-
-                        /*
-                        String response = inputStream.readUTF();
-
-                        if(response.contains("success")){
-                            Server.logger.warning("From: " +subscriber.getKey().getRemoteSocketAddress() +
-                                                        " relayed to: "+target.toString()+
-                                                        " for "+subscription.getKey().getId());
-                        }
-                        */
-
                     }
-
                 }
-
-
             }
             relay.put(target, socket);
-            Server.logger.info("relay connection opened " + target.toString());
-
+            Nodes.logger.info("relay connection opened " + target.toString());
         } catch (IOException e) {
-            Server.logger.warning("IOException when subscribe relay to " + target.toString());
+            Nodes.logger.warning("IOException when subscribe relay to " + target.toString());
         }
 
 
@@ -232,12 +142,7 @@ public class ServerList {
         ConcurrentHashMap<Host, Socket> relay;
 
         try {
-            if (secure) {
-                relay = Server.secure_relay;
-            } else {
-                relay = Server.unsecure_relay;
-            }
-
+            relay = Nodes.unsecure_relay;
             socket = relay.get(target);
 
             DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
@@ -245,7 +150,7 @@ public class ServerList {
 
 
             //traverse all subscribers
-            for (Map.Entry<Socket, Subscription> subscriber : Server.subscriptions.entrySet()) {
+            for (Map.Entry<Socket, Subscription> subscriber : Nodes.subscriptions.entrySet()) {
                 //get all subscribe message of this subscriber
                 ConcurrentHashMap<SubscribeMessage, Integer> messages = subscriber.getValue().getSubscribeMessage();
                 for (Map.Entry<SubscribeMessage, Integer> subscription : messages.entrySet()) {
@@ -259,7 +164,7 @@ public class ServerList {
                         String response = inputStream.readUTF();
 
                         if (response.contains("resultSize")) {
-                            Server.logger.warning("Terminate from: " + subscriber.getKey().getRemoteSocketAddress() +
+                            UN.logger.warning("Terminate from: " + subscriber.getKey().getRemoteSocketAddress() +
                                     " relayed to: " + target.toString() +
                                     " for " + subscription.getKey().getId());
                         }
@@ -274,7 +179,7 @@ public class ServerList {
 
 
         } catch (IOException e) {
-            Server.logger.warning("IOException when subscribe relay to " + target.toString());
+            Nodes.logger.warning("IOException when subscribe relay to " + target.toString());
         }
     }
 
@@ -282,12 +187,7 @@ public class ServerList {
 
         ConcurrentHashMap<Host, Socket> relay;
 
-        if (secure) {
-            relay = Server.secure_relay;
-        } else {
-            relay = Server.unsecure_relay;
-        }
-
+        relay = Nodes.unsecure_relay;
 
         try {
             for (Map.Entry<Host, Socket> entry : relay.entrySet()) {
@@ -297,12 +197,12 @@ public class ServerList {
 
                 outputStream.writeUTF(JSON);
                 outputStream.flush();
-                Server.logger.fine("message relayed");
+                Nodes.logger.fine("message relayed");
 
             }
 
         } catch (IOException e) {
-            Server.logger.warning("IOException when subscribe relay: " + e.getMessage());
+            Nodes.logger.warning("IOException when subscribe relay: " + e.getMessage());
             e.printStackTrace();
             System.out.println("JSON : " + JSON);
         }
@@ -312,17 +212,13 @@ public class ServerList {
     public synchronized void refreshAllRelay() {
         ConcurrentHashMap<Host, Socket> relay;
 
-        if (secure) {
-            relay = Server.secure_relay;
-        } else {
-            relay = Server.unsecure_relay;
-        }
-
+        relay = Nodes.unsecure_relay;
         relay = new ConcurrentHashMap<>();
 
         for (Host h : this.serverList) {
             openSubscribeRelay(h);
         }
+        //point??@larry
 
     }
 

@@ -13,10 +13,11 @@ import java.net.Socket;
  */
 public class SecureWorkerThreadTest extends WorkerThreadTest {
     protected void refreshWorkerThread() {
-        try {
-            w = new WorkerThread(new Socket(), new FileList(), new ServerList(true), true);
-        } catch (IOException e) {
-            Assert.fail(e.getMessage());
-        }
+//        try {
+//            w = new WorkerThread(new Socket(), new FileList(), new ServerList(true), true,false);
+//        } catch (IOException e) {
+//            Assert.fail(e.getMessage());
+//        }
+        w = new WorkerThread(new Socket(), new FileList(), new ServerList(true), true,false);
     }
 }

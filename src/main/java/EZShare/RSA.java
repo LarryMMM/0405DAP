@@ -1,5 +1,11 @@
 package EZShare;
 
+import sun.nio.cs.UTF_32;
+
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -13,6 +19,7 @@ import java.util.Base64;
 
 
 public class RSA {
+
     public static void main(String[] args) {
         //RSA KEY GENERATION
         ArrayList<Key> keyPair= getKeyPair("RSA");
@@ -27,6 +34,38 @@ public class RSA {
         System.err.println("Public Key Loaded: " + keyPairLoad.get(0));
         System.err.println("Private Key Loaded: " + keyPairLoad.get(1));
 
+        //ENCRYPT MESSAGE
+        byte[] cipherMsg = new byte[0];
+        try {
+            cipherMsg = encryptMessage((PublicKey) keyPairLoad.get(0),"RSA/ECB/PKCS1Padding","testEncyption");
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        } catch (BadPaddingException e) {
+            e.printStackTrace();
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
+        }
+        //DECRYPT MESSAGE
+        String Msg = null;
+        try {
+            Msg = decryptMessage((PrivateKey)keyPairLoad.get(1),"RSA/ECB/PKCS1Padding",cipherMsg);
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        } catch (BadPaddingException e) {
+            e.printStackTrace();
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
+        }
+        System.err.println("cipherMessage :" + Base64.getEncoder().encodeToString(cipherMsg));
+        System.err.println("plainMessage  :"+ Msg);
         //RSA KEY SAVE AS TEXT
         saveKeyPairText(keyPair,"LarryKeyPairTextTest");
 
@@ -110,6 +149,19 @@ public class RSA {
         return null;
     }
 
+    private static byte[] encryptMessage(PublicKey pubKey,String algorithm, String message) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
+        Cipher encryptCipher = Cipher.getInstance(algorithm);
+        encryptCipher.init(Cipher.ENCRYPT_MODE,pubKey);
+        return encryptCipher.doFinal(message.getBytes());
+//            System.err.println(cipherText);
+    }
+
+    private static String decryptMessage(PrivateKey pvtKey,String algorithm,byte[] cipherMessage) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
+        Cipher decryptCipher = Cipher.getInstance(algorithm);
+        decryptCipher.init(Cipher.PRIVATE_KEY, pvtKey);
+        return new String(decryptCipher.doFinal(cipherMessage));
+    }
+
     private static void saveKeyPairText(ArrayList<Key> keyPair,String keyNameText){
         try {
             PublicKey pubKey = (PublicKey) keyPair.get(0);
@@ -182,5 +234,6 @@ public class RSA {
         }
         return false;
     }
+
 
 }

@@ -1,10 +1,11 @@
 package EZShare.server;
 
-import EZShare.Server;
+import EZShare.Nodes;
 import EZShare.message.ResourceTemplate;
 import EZShare.message.SubscribeMessage;
 import com.google.gson.Gson;
 
+import javax.xml.soap.Node;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
@@ -34,7 +35,7 @@ public class FileList {
     public void sendNotification(ResourceTemplate candidate) {
 
         //Travers all unrelayed subscriptions.
-        for (Map.Entry<Socket, Subscription> s : Server.subscriptions.entrySet()) {
+        for (Map.Entry<Socket, Subscription> s : Nodes.subscriptions.entrySet()) {
 
             //get socket
             Socket socket = s.getKey();
@@ -59,17 +60,17 @@ public class FileList {
 
                             output.writeUTF(gson.toJson(encrypted_candidate, ResourceTemplate.class));
                             output.flush();
-                            Server.logger.log(Level.FINE, "Matched resource sent:" + candidate, socket.getRemoteSocketAddress().toString());
+                            Nodes.logger.log(Level.FINE, "Matched resource sent:" + candidate, socket.getRemoteSocketAddress().toString());
                             //set sent to true to prevent send a same resource twice
                             sent = true;
                         }
                         //increase result size
-                        Server.subscriptions.get(socket).addResult(entry.getKey().getId());
+                        Nodes.subscriptions.get(socket).addResult(entry.getKey().getId());
                         //break to avoid send one message several times
 
 
                     } catch (IOException e) {
-                        Server.logger.log(Level.WARNING, "{0} IOException when sending subscribed resource! ", e.getMessage());
+                        Nodes.logger.log(Level.WARNING, "{0} IOException when sending subscribed resource! ", e.getMessage());
                     }
                 }
             }
