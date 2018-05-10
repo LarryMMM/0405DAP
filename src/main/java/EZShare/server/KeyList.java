@@ -1,15 +1,15 @@
 package EZShare.server;
 import EZShare.Nodes;
 import EZShare.RSA;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 
 
 public class KeyList {
-    private static HashMap<String,RSA> keyList;
-    public KeyList(HashMap<String,RSA> keyList){this.keyList=keyList;}
+    private static ConcurrentHashMap<String,RSA> keyList;
+    public KeyList(ConcurrentHashMap<String,RSA> keyList){this.keyList=keyList;}
 
-    public synchronized void updateKeyList(HashMap<String,RSA> inputKeyList) {
+    public synchronized void updateKeyList(ConcurrentHashMap<String,RSA> inputKeyList) {
         for(String clientId : inputKeyList.keySet()){
           if (keyList.containsKey(clientId)){
                 keyList.replace(clientId,inputKeyList.get(clientId));
