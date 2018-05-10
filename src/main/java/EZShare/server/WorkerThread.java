@@ -22,13 +22,14 @@ public class WorkerThread extends Thread {
     private FileList fileList;
     private ServerList serverList;
     private boolean isUltraNode;
-
     private boolean secure;
     private DataOutputStream output;
     private DataInputStream input;
     private String ClientAddress;
     private Gson gson = new Gson();
 
+    private int maxHops;//maximum hops to visit
+    private int max;
     /**
      * Initialize worker thread, create IO streams.
      *
@@ -377,6 +378,7 @@ public class WorkerThread extends Thread {
         }
     }
 
+    /*exchange no need to change,used for connecting nodes @larry*/
     public void processExchange(List<String> outputJsons, String JSON) {
         try {
             ExchangeMessage exchangeMessage = gson.fromJson(JSON, ExchangeMessage.class);
@@ -403,6 +405,7 @@ public class WorkerThread extends Thread {
         }
     }
 
+    /*query done @larry*/
     public void processQuery(List<String> outputJsons, String JSON) {
         try {
             QueryMessage queryMessage = gson.fromJson(JSON, QueryMessage.class);
