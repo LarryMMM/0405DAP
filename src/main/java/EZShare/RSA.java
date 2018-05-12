@@ -66,13 +66,20 @@ public class RSA {
 //        saveKeyPairText(keyPair,"LarryKeyPairTextTest");
 //
 //        //GENERATE RSA SIGNATURE
-//        getSignature((PrivateKey) keyPairLoad.get(1),"SHA256withRSA", "LarrySignatureTest.txt");
+//        getSignatureFile((PrivateKey) keyPairLoad.get(1),"SHA256withRSA", "LarrySignatureTest.txt");
 //
 //        //VERIFY RSA SIGNATURE
-//        boolean verify = verifySignature((PublicKey)keyPairLoad.get(0),"SHA256withRSA",
+//        boolean verify = verifySignatureFile((PublicKey)keyPairLoad.get(0),"SHA256withRSA",
 //                "LarrySignatureTest.txt","signed"+ "LarrySignatureTest.txt");
 //        System.err.println(verify);
+//
+//        //GENERATE RSA SIGNATURE FOR MESSAGE
+//        String inputMessage = "Larry is genius!";
+//        String outputMessage = getSignatureMessage((PrivateKey) keyPairLoad.get(1),"SHA256withRSA",inputMessage);
+//        System.out.println(outputMessage);
 //    }
+
+
     private PublicKey pubKey;
     private PrivateKey pvtKey;
     private String id;
@@ -85,6 +92,7 @@ public class RSA {
     public RSA(){
         this.pubKey = (PublicKey) getKeyPair("RSA").get(0);
         this.pvtKey = (PrivateKey)getKeyPair("RSA").get(1);
+//        saveKeyPair(getKeyPair("RSA"),id);
     }
 
     public RSA(String clientId){
@@ -200,7 +208,43 @@ public class RSA {
         }
     }
 //save RSA KEY as txt
-    public static void getSignature(PrivateKey pvtKey,String algorithm,String fileName){
+    public static String getSignatureMessage(PrivateKey pvtKey,String algorithm,String message){
+        try {
+            Signature sign = Signature.getInstance(algorithm);
+            sign.initSign(pvtKey);
+            if(!message.isEmpty()){
+                sign.update(message.getBytes());
+            }
+            System.err.println("generate RSA signature succeed!");
+            return (message+ sign.sign());
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (SignatureException e) {
+            e.printStackTrace();
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        }
+        System.err.println("generate RSA signature failed!");
+        return null;
+    }
+    public static boolean verifySignatureMessage(PublicKey pubKey,String algorithm,String unsignedMessage,String signedMessage){
+        try {
+            Signature sign = Signature.getInstance(algorithm);
+            sign.initVerify(pubKey);
+            if(!unsignedMessage.isEmpty()){
+                sign.update(signedMessage.getBytes());
+            }
+            return(sign.verify(unsignedMessage.getBytes()));
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (SignatureException e) {
+            e.printStackTrace();
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+    public static void getSignatureFile(PrivateKey pvtKey,String algorithm,String fileName){
         try {
             Signature sign = Signature.getInstance(algorithm);
             sign.initSign(pvtKey);
@@ -226,7 +270,7 @@ public class RSA {
         }
     }
 //create signature
-    public static boolean verifySignature(PublicKey pubKey,String algorithm,String unsignedFileName,String signedFileName){
+    public static boolean verifySignatureFile(PublicKey pubKey,String algorithm,String unsignedFileName,String signedFileName){
         try {
             Signature sign = Signature.getInstance(algorithm);
             sign.initVerify(pubKey);

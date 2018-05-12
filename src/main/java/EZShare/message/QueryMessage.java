@@ -9,17 +9,19 @@ public class QueryMessage extends Message {
 
     private boolean relay;
     private final ResourceTemplate resourceTemplate;
-
+    private int mxHops;
     public void setRelay(boolean relay) {
         this.relay = relay;
     }
 
-    public QueryMessage(ResourceTemplate resourceTemplate, boolean relay){
+    public QueryMessage(ResourceTemplate resourceTemplate, boolean relay,int mxHops){
         super("QUERY");
         this.resourceTemplate = resourceTemplate;
         this.relay = relay;
+        this.mxHops = mxHops;
     }
-
+    public int getMxHops(){return this.mxHops;}
+    public void setMxHops(int mxHops){this.mxHops = mxHops;}
     public ResourceTemplate getResourceTemplate() {
         return resourceTemplate;
     }

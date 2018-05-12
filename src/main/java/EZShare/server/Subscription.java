@@ -1,12 +1,8 @@
 package EZShare.server;
 
 import EZShare.message.Host;
-import EZShare.message.ResourceTemplate;
 import EZShare.message.SubscribeMessage;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -19,19 +15,16 @@ public class Subscription {
     private ConcurrentHashMap<SubscribeMessage,Integer> subscribeMessage = new ConcurrentHashMap<>();
     private String origin;
     private Host target;
-    private boolean secure;
 
-    public Subscription(SubscribeMessage subscribeMessage, String origin, Host target, boolean secure) {
+    public Subscription(SubscribeMessage subscribeMessage, String origin, Host target) {
         this.origin = origin;
         this.target = target;
         this.subscribeMessage.put(subscribeMessage,0);
-        this.secure = secure;
     }
 
-    public Subscription(SubscribeMessage subscribeMessage, String origin, boolean secure) {
+    public Subscription(SubscribeMessage subscribeMessage, String origin) {
         this.origin = origin;
         this.subscribeMessage.put(subscribeMessage,0);
-        this.secure = secure;
     }
 
 
@@ -79,12 +72,5 @@ public class Subscription {
         return origin;
     }
 
-    public boolean isSecure() {
-        return secure;
-    }
-
-    public void setSecure(boolean secure) {
-        this.secure = secure;
-    }
 
 }

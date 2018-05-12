@@ -1,5 +1,10 @@
 package EZShare.message;
 
+import EZShare.Nodes;
+
+import javax.xml.soap.Node;
+import java.util.logging.Level;
+
 /**
  * Encapsulation of Share Command.
  * Created by jason on 11/4/17.
@@ -25,6 +30,9 @@ public class ShareMessage extends Message{
      */
     @Override
     public boolean isValid() {
+//        Nodes.logger.log(Level.INFO, "{0} : valid resource?", resource.isValid());
+//        Nodes.logger.log(Level.INFO, "{0} : valid File?", resource.isValidFile());
+
         return resource.isValid()&&resource.isValidFile();
     }
 }

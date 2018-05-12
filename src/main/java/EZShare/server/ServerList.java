@@ -18,6 +18,7 @@ import java.net.UnknownHostException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.logging.Level;
 
 /**
  * @author Wenhao Zhao
@@ -25,15 +26,13 @@ import java.util.concurrent.ThreadLocalRandom;
 public class ServerList {
     private Gson gson = new Gson();
 
-    private boolean secure;
-
     public static final int SERVER_TIMEOUT = (int) Nodes.EXCHANGE_PERIOD / 2;
 
-    private final List<Host> serverList = new ArrayList<>();
+    private List<Host> serverList = new ArrayList<>();
 
 
-    public ServerList(boolean secure) {
-        this.secure = secure;
+    public ServerList() {
+
     }
 
     public synchronized List<Host> getServerList() {
@@ -61,12 +60,11 @@ public class ServerList {
     }
 /*no regular exchange*/
 
-    public synchronized void removeServer(Host inputHost, boolean secure) {
+    public synchronized void removeServer(Host inputHost) {
 
-        closeSubscribeRelay(inputHost);
-
+//        closeSubscribeRelay(inputHost);
         serverList.remove(inputHost);
-
+        System.out.println(inputHost+"removed from server list");
     }
 
     private synchronized boolean containsHost(Host inputHost) {
@@ -118,9 +116,13 @@ public class ServerList {
                 ConcurrentHashMap<SubscribeMessage, Integer> messages = subscriber.getValue().getSubscribeMessage();
                 for (Map.Entry<SubscribeMessage, Integer> subscription : messages.entrySet()) {
                     //if this message have relay=true
+                    int mxHops = subscription.getKey().getMxHops();
+                    if (mxHops == 1){
+                        subscription.getKey().setRelay(false);
+                    }
                     if (subscription.getKey().isRelay()) {
-                        SubscribeMessage forwarded = new SubscribeMessage(false, subscription.getKey().getId(),
-                                subscription.getKey().getResourceTemplate());
+                        SubscribeMessage forwarded = new SubscribeMessage(subscription.getKey().isRelay(), subscription.getKey().getId(),
+                                subscription.getKey().getResourceTemplate(),(mxHops-1));
 
                         String JSON = gson.toJson(forwarded, SubscribeMessage.class);
                         outputStream.writeUTF(JSON);
@@ -140,15 +142,27 @@ public class ServerList {
     public synchronized void closeSubscribeRelay(Host target) {
         Socket socket = null;
         ConcurrentHashMap<Host, Socket> relay;
-
         try {
+            socket = new Socket();
             relay = Nodes.unsecure_relay;
+            Nodes.logger.log(Level.FINE, "relay getting:{0}",relay.toString());
+            System.out.println("values");
+            System.out.println(relay.values());
+            System.out.println("keys");
+            System.out.println(relay.keySet());
+            System.out.println("target");
+            System.out.println(target);
+            System.out.println(relay.keySet().contains(target));
             socket = relay.get(target);
+            Nodes.logger.log(Level.FINE, "socket getting:{0}", socket.getRemoteSocketAddress().toString());
+            socket.connect(new InetSocketAddress(target.getHostname(), target.getPort()));
+            Nodes.logger.log(Level.FINE, "fetching to {0}", socket.getRemoteSocketAddress().toString());
+            socket.setSoTimeout(3000);
+//            Nodes.logger.log(Level.FINE, "socket connecting:{0}",target);
+//            socket.connect(new InetSocketAddress(target.getHostname(), target.getPort()),SERVER_TIMEOUT);
 
             DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
             DataInputStream inputStream = new DataInputStream(socket.getInputStream());
-
-
             //traverse all subscribers
             for (Map.Entry<Socket, Subscription> subscriber : Nodes.subscriptions.entrySet()) {
                 //get all subscribe message of this subscriber
@@ -159,25 +173,10 @@ public class ServerList {
                         String JSON = gson.toJson(new UnsubscribeMessage(subscription.getKey().getId()), UnsubscribeMessage.class);
                         outputStream.writeUTF(JSON);
                         outputStream.flush();
-
-                        /*
-                        String response = inputStream.readUTF();
-
-                        if (response.contains("resultSize")) {
-                            UN.logger.warning("Terminate from: " + subscriber.getKey().getRemoteSocketAddress() +
-                                    " relayed to: " + target.toString() +
-                                    " for " + subscription.getKey().getId());
-                        }
-                        */
                     }
-
                 }
-
-
             }
-            relay.remove(target);
-
-
+//            relay.remove(target);
         } catch (IOException e) {
             Nodes.logger.warning("IOException when subscribe relay to " + target.toString());
         }

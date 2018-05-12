@@ -35,10 +35,11 @@ public class Nodes {
     public static boolean isUltraNode = false;
     public static final int TIME_OUT = 30000;//each connection time out
     public static final String download_path = "Downloads/";
-
+    public static final int MAX_NODES_TO_EXPAND = 4;//maximum nodes for one hop to visit
+    public static final int MAX_HOPS = 7;
     /* Data structures and utilities */
     private static final FileList fileList = new FileList();
-    private static final ServerList serverList = new ServerList(false);
+    private static final ServerList serverList = new ServerList();
     public static final Logger logger = LogCustomFormatter.getLogger(Nodes.class.getName());
     private static final Gson gson = new Gson();
 
@@ -203,7 +204,7 @@ public class Nodes {
 
         logger.fine("querying to :" + socket.getRemoteSocketAddress());
 
-        QueryMessage queryMessage = new QueryMessage(resourceTemplate, true);
+        QueryMessage queryMessage = new QueryMessage(resourceTemplate, true, MAX_HOPS);
 
         String JSON = gson.toJson(queryMessage);
         sendMessage(output, JSON);
@@ -364,7 +365,7 @@ public class Nodes {
 
         logger.fine("fetching to : " + socket.getRemoteSocketAddress());
 
-        FetchMessage fetchMessage = new FetchMessage(resourceTemplate);
+        FetchMessage fetchMessage = new FetchMessage(resourceTemplate,MAX_HOPS);
 
         String JSON = gson.toJson(fetchMessage);
         sendMessage(output, JSON);
@@ -463,13 +464,10 @@ public class Nodes {
         logger.fine("subscribing to :" + socket.getRemoteSocketAddress());
 
         //construct subscribe message.
-        SubscribeMessage subscribeMessage = new SubscribeMessage(relay, id, resourceTemplate);
-
+        SubscribeMessage subscribeMessage = new SubscribeMessage(relay, id, resourceTemplate,MAX_HOPS);
         String JSON = gson.toJson(subscribeMessage);
         sendMessage(output, JSON);
-
         String response = input.readUTF();
-
         //if successfully subscribed
         if (response.contains("success")) {
             logger.fine("RECEIVED:" + response);
@@ -559,7 +557,7 @@ public class Nodes {
                                 /* Assign a worker thread for this socket. */
 //                                System.out.println("begin test for threadpool");
                                 try {
-                                    Nodes.threadPool.submit(new WorkerThread(client, fileList, serverList, false,isUltraNode));
+                                    Nodes.threadPool.submit(new WorkerThread(client, fileList, serverList, isUltraNode,MAX_HOPS));
                                 }catch (Exception e) {
                                     e.printStackTrace();
                                     logger.log(Level.WARNING, "{0} cannot create stream", client.getRemoteSocketAddress().toString());
@@ -629,8 +627,8 @@ public class Nodes {
             }
             /* share command has to change @larry*/
             if (cmdLine.hasOption("share")) {
-                if (!cmdLine.hasOption("uri") || !cmdLine.hasOption("secret")) {
-                    error_message = "URI or secret missing.";
+                if (!cmdLine.hasOption("uri") ) {
+                    error_message = "URI missing.";
                 } else {
                     shareCommand(socket, resourceTemplate);
                 }

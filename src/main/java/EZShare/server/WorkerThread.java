@@ -8,6 +8,7 @@ import java.net.*;
 import java.util.*;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonIOException;
 import com.google.gson.JsonSyntaxException;
 
 import java.util.concurrent.ConcurrentHashMap;
@@ -22,14 +23,12 @@ public class WorkerThread extends Thread {
     private FileList fileList;
     private ServerList serverList;
     private boolean isUltraNode;
-    private boolean secure;
     private DataOutputStream output;
     private DataInputStream input;
     private String ClientAddress;
     private Gson gson = new Gson();
-
     private int maxHops;//maximum hops to visit
-    private int max;
+
     /**
      * Initialize worker thread, create IO streams.
      *
@@ -37,15 +36,14 @@ public class WorkerThread extends Thread {
      * @param fileList   reference of file list.
      * @param serverList reference of server list.
      */
-    public WorkerThread(Socket client, FileList fileList, ServerList serverList,boolean secure,boolean isUltraNode) {
+    public WorkerThread(Socket client, FileList fileList, ServerList serverList,boolean isUltraNode,int maxHops) {
         this.client = client;
         this.fileList = fileList;
         this.serverList = serverList;
         this.isUltraNode = isUltraNode;
-        // Is it a Secure Socket?
-        this.secure = secure;
-        Nodes.logger.log(Level.INFO, "SecureSocket : {0}", this.secure);
+        this.maxHops = maxHops;
         Nodes.logger.log(Level.INFO, "is ultra node : {0}", this.isUltraNode);
+        Nodes.logger.log(Level.INFO,"maximum hops to route:{0}",this.maxHops);
     }
     @Override
     public void run() {
@@ -74,7 +72,6 @@ public class WorkerThread extends Thread {
             Nodes.logger.log(Level.WARNING, "{0} : Socket Timeout", this.ClientAddress);
         } catch (IOException e) {
             /* Socket time out in establishing. */
-            e.printStackTrace();
             Nodes.logger.log(Level.WARNING, "{0} : IOException!", this.ClientAddress);
         } finally {
             try {
@@ -138,6 +135,8 @@ public class WorkerThread extends Thread {
         return outputJsons;
     }
 
+    /*subscription should be passed over if it is ultra node*/
+    /*needs to check correctness for multiple subscription and termination @larry*/
     public void processSubscribe(List<String> outputJsons, String JSON) throws IOException {
         try {
             SubscribeMessage subscribeMessage = gson.fromJson(JSON, SubscribeMessage.class);
@@ -145,34 +144,29 @@ public class WorkerThread extends Thread {
             if (subscribeMessage.getResourceTemplate() == null) {
                 throw new JsonSyntaxException("missing resourceTemplate");
             }
-
+            ResourceTemplate r = subscribeMessage.getResourceTemplate();
+            Nodes.logger.log(Level.INFO, "{0} subscribing for {1}", new Object[]{client.getRemoteSocketAddress(), r.toString()});
 
             if (!subscribeMessage.isValid()) {
                 Nodes.logger.log(Level.WARNING, "{0} : invalid resourceTemplate", this.ClientAddress);
                 outputJsons.add(getErrorMessageJson("invalid resourceTemplate"));
-
-                //handle unrelayed subscription.
+                //handle non-relayed subscription.
             } else if (!subscribeMessage.isRelay()) {
-
-                //send success message.
+                //send success message.asynchronous
+                //relay is false,which means the last node to subscribe
                 String response = getSubscribeSuccessMessageJson(subscribeMessage.getId());
-
                 this.output.writeUTF(response);
                 this.output.flush();
-
                 //put the subscription in list
-                Nodes.subscriptions.put(this.client, new Subscription(subscribeMessage, this.ClientAddress, secure));
-
+                Nodes.subscriptions.put(this.client, new Subscription(subscribeMessage, this.ClientAddress));
                 Nodes.logger.log(Level.FINE, "{0} : Resource subscribed!(relay=false)", this.ClientAddress);
-
                 //block until user terminate.
-
                 while (true) {
                     String next;
                     try {
                         if ((next = this.input.readUTF()) != null) {
                             if (next.contains("UNSUBSCRIBE")) {
-                                //unsub for this subscription
+                                //unsubscribe for this subscription
                                 UnsubscribeMessage unsubscribeMessage = gson.fromJson(next, UnsubscribeMessage.class);
                                 Nodes.subscriptions.get(this.client).removeSubscribeMessage(unsubscribeMessage.getId());
                                 String resultsize = getResultSizeJson((long) Nodes.subscriptions.get(this.client).getResultSize(unsubscribeMessage.getId()));
@@ -182,7 +176,6 @@ public class WorkerThread extends Thread {
                                 if (Nodes.subscriptions.get(this.client).getSubscribeMessage().size() == 0) {
                                     break;
                                 }
-
                             } else if (next.contains("SUBSCRIBE")) {
                                 SubscribeMessage newsubscribe = gson.fromJson(next, SubscribeMessage.class);
                                 Nodes.subscriptions.get(this.client).addSubscribeMessage(newsubscribe);
@@ -192,18 +185,13 @@ public class WorkerThread extends Thread {
 
                     }
                 }
-
-
             } else if (subscribeMessage.isRelay()) {
-
                 //send success message.
                 String response = getSubscribeSuccessMessageJson(subscribeMessage.getId());
-
                 this.output.writeUTF(response);
                 this.output.flush();
 
                 boolean needrefresh = true;
-
                 for (Map.Entry<Socket, Subscription> entry : Nodes.subscriptions.entrySet()) {
                     ConcurrentHashMap<SubscribeMessage, Integer> sms = entry.getValue().getSubscribeMessage();
                     for (Map.Entry<SubscribeMessage, Integer> m : sms.entrySet()) {
@@ -216,59 +204,49 @@ public class WorkerThread extends Thread {
                         break;
                     }
                 }
-
                 if (needrefresh) {
                     serverList.refreshAllRelay();
                 }
-
+                int mxHops = subscribeMessage.getMxHops();
+                if (mxHops == 1){
+                    subscribeMessage.setRelay(false);//set relay as false when reaching max hops
+                }
                 //put the subscription in list
-                Nodes.subscriptions.put(this.client, new Subscription(subscribeMessage, this.ClientAddress, secure));
-
-                SubscribeMessage forwarded = new SubscribeMessage(false, subscribeMessage.getId(), subscribeMessage.getResourceTemplate());
+                Nodes.subscriptions.put(this.client, new Subscription(subscribeMessage, this.ClientAddress));
+                SubscribeMessage forwarded = new SubscribeMessage(subscribeMessage.isRelay(), subscribeMessage.getId(),
+                        subscribeMessage.getResourceTemplate(),(mxHops-1));
                 serverList.doMessageRelay(gson.toJson(forwarded));
-
                 Nodes.logger.log(Level.FINE, "{0} : Resource subscribed!(relay=true)", this.ClientAddress);
-
                 //block until user terminate.
                 String next;
-
                 while (true) {
                     if ((next = this.input.readUTF()) != null) {
                         break;
                     }
                 }
-
                 serverList.doMessageRelay(gson.toJson(new UnsubscribeMessage(subscribeMessage.getId())));
-
                 Subscription subscription = Nodes.subscriptions.get(this.client);
-
                 int size = 0;
-
                 for (Map.Entry<SubscribeMessage, Integer> entry : subscription.getSubscribeMessage().entrySet()) {
                     size += entry.getValue();
                 }
-
                 JSON = getResultSizeJson((long) size);
-
                 this.output.writeUTF(JSON);
                 this.output.flush();
-
                 Nodes.subscriptions.remove(this.client);
-
             }
-
-
         } catch (JsonSyntaxException e) {
             Nodes.logger.log(Level.WARNING, "{0} : missing resourceTemplate", this.ClientAddress);
             outputJsons.add(getErrorMessageJson("missing resourceTemplate"));
         }
-
-
     }
 
-
+    /*cannot publish to ultra node,but normal to local or friend nodes*/
     public void processPublish(List<String> outputJsons, String JSON) {
         try {
+            if (isUltraNode){
+                throw new Exception("cannot publish resource to ultra node");
+            }
             PublishMessage publishMessage = gson.fromJson(JSON, PublishMessage.class);
 
             if (publishMessage.getResource() == null) {
@@ -285,7 +263,6 @@ public class WorkerThread extends Thread {
             } else if (!fileList.add(r)) {
                 Nodes.logger.log(Level.WARNING, "{0} : cannot publish resource", this.ClientAddress);
                 outputJsons.add(getErrorMessageJson("cannot publish resource"));
-
             } else {
                 Nodes.logger.log(Level.FINE, "{0} : resource published!", this.ClientAddress);
                 outputJsons.add(getSuccessMessageJson());
@@ -293,11 +270,18 @@ public class WorkerThread extends Thread {
         } catch (JsonSyntaxException e) {
             Nodes.logger.log(Level.WARNING, "{0} : missing resource", this.ClientAddress);
             outputJsons.add(getErrorMessageJson("missing resource"));
+        }catch(Exception e){
+            Nodes.logger.log(Level.INFO,"{0}:cannot publish resource to ultra node",this.ClientAddress);
+            outputJsons.add(getErrorMessageJson("cannot publish resource to ultra node"));
         }
     }
 
+    /*cannot remove anything in ultra node,but normal to local or friend nodes*/
     public void processRemove(List<String> outputJsons, String JSON) {
         try {
+            if (isUltraNode){
+                throw new Exception("no resource to remove in ultra node");
+            }
             RemoveMessage removeMessage = gson.fromJson(JSON, RemoveMessage.class);
 
             if (removeMessage.getResource() == null) {
@@ -321,15 +305,22 @@ public class WorkerThread extends Thread {
         } catch (JsonSyntaxException e) {
             Nodes.logger.log(Level.WARNING, "{0} : missing resource", this.ClientAddress);
             outputJsons.add(getErrorMessageJson("missing resource"));
+        } catch (Exception e) {
+            Nodes.logger.log(Level.INFO,"{0}:no resource to remove in ultra node",this.ClientAddress);
+            outputJsons.add(getErrorMessageJson("no resource to remove in ultra node"));
         }
     }
 
+    /*cannot share anything in ultra node since it is almost empty,but normal to local or friend nodes */
     public void processShare(List<String> outputJsons, String JSON) {
         try {
+            if (isUltraNode){
+                throw new Exception("no resource to share in ultra node");
+            }
             ShareMessage shareMessage = gson.fromJson(JSON, ShareMessage.class);
 
             if (shareMessage.getResource() == null) {
-                throw new JsonSyntaxException("missing secret and/or resource");
+                throw new JsonSyntaxException("missing resource");
             }
 
             ResourceTemplate r = shareMessage.getResource();
@@ -341,11 +332,6 @@ public class WorkerThread extends Thread {
                 Nodes.logger.log(Level.WARNING, "{0} : invalid resource", this.ClientAddress);
                 outputJsons.add(getErrorMessageJson("invalid resource"));
             }
-//            else if (!shareMessage.getSecret().equals(Nodes.SECRET)) {
-//                //secret incorrect
-//                Nodes.logger.log(Level.WARNING, "{0} : incorrect secret", this.ClientAddress);
-//                outputJsons.add(getErrorMessageJson("incorrect secret"));
-//            }
             else {
                 String message;
                 File f = new File(new URI(r.getUri()).getPath());
@@ -370,15 +356,18 @@ public class WorkerThread extends Thread {
             }
 
         } catch (JsonSyntaxException e) {
-            Nodes.logger.log(Level.WARNING, "{0} : missing resource and/or secret", this.ClientAddress);
-            outputJsons.add(getErrorMessageJson("missing resource and/or secret"));
+            Nodes.logger.log(Level.WARNING, "{0} : missing resource", this.ClientAddress);
+            outputJsons.add(getErrorMessageJson("missing resource"));
         } catch (URISyntaxException e) {
             Nodes.logger.log(Level.WARNING, "{0} : unable to create URI", this.ClientAddress);
             outputJsons.add(getErrorMessageJson("cannot share resource"));
+        } catch (Exception e) {
+            Nodes.logger.log(Level.INFO,"{0}:no resource to share in ultra node",this.ClientAddress);
+            outputJsons.add(getErrorMessageJson("no resource to share in ultra node"));
         }
     }
 
-    /*exchange no need to change,used for connecting nodes @larry*/
+    /*exchange no need to change,used for connecting nodes*/
     public void processExchange(List<String> outputJsons, String JSON) {
         try {
             ExchangeMessage exchangeMessage = gson.fromJson(JSON, ExchangeMessage.class);
@@ -405,59 +394,75 @@ public class WorkerThread extends Thread {
         }
     }
 
-    /*query done @larry*/
+    /*query done*/
     public void processQuery(List<String> outputJsons, String JSON) {
         try {
             QueryMessage queryMessage = gson.fromJson(JSON, QueryMessage.class);
-//            System.out.println("query message is relay:"+queryMessage.isRelay());//@@@larry
-            //queryMessage.isRelay() is always true since message passed in is true
-//            System.out.println("queryMsg.class print:"+QueryMessage.class);
             if (queryMessage.getResourceTemplate() == null) {
                 throw new JsonSyntaxException("missing resource");
             }
             ResourceTemplate r = queryMessage.getResourceTemplate();
-
             Nodes.logger.log(Level.INFO, "{0} querying for {1}", new Object[]{client.getRemoteSocketAddress(), r.toString()});
-
             if (!queryMessage.isValid()) {
                 Nodes.logger.log(Level.WARNING, "{0} : invalid resourceTemplate", this.ClientAddress);
                 outputJsons.add(getErrorMessageJson("invalid resourceTemplate"));
             } else{
-                //relay is always true, query local resource first
-                //do not change original query
+                //relay is always true, query local resource first and query forward
                 List<ResourceTemplate> result = this.fileList.query(r);
-                QueryMessage relayMessage = gson.fromJson(JSON, QueryMessage.class);
-
-                //relayMessage.setRelay(false);//should always be true to relay forward
-
-                //append result set by querying remote servers
-                try {
-                    for (Host h : this.serverList.getServerList()) {
-                        List<ResourceTemplate> rtl = doSingleQueryRelay(h, relayMessage);
-                        if (!rtl.isEmpty())
-                            result.addAll(rtl);
+                int mxHops = queryMessage.getMxHops();
+                if (!result.isEmpty() || mxHops == 0){
+                    outputJsons.add(getSuccessMessageJson());
+                    Nodes.logger.fine("Query Success");
+                    for (ResourceTemplate rt : result) {
+                        if (!rt.getOwner().equals("")) {
+                            rt.setOwner("*");
+                        }
+                        outputJsons.add(rt.toString());
                     }
-                }catch (Exception e){
-                    Nodes.logger.log(Level.WARNING,"{0} : No available server :",this.serverList.getServerList());
-                }
-
-                outputJsons.add(getSuccessMessageJson());
-                for (ResourceTemplate rt : result) {
-                    if (!rt.getOwner().equals("")) {
-                        rt.setOwner("*");
+                }else {
+                    //when hops are not cast over,i.e. mxHops>1
+                    QueryMessage relayMessage = gson.fromJson(JSON, QueryMessage.class);
+                    relayMessage.setMxHops(mxHops-1);
+                    relayMessage.getResourceTemplate().setOwner("");
+                    relayMessage.getResourceTemplate().setChannel("");
+                    //append result set by querying remote servers
+                    /*to make sure it wont expand node more than limited*/
+                    if (Nodes.MAX_NODES_TO_EXPAND >= this.serverList.getServerList().size()){
+                        //if server list is smaller than nodes to expand
+                        for (Host h : this.serverList.getServerList()) {
+                            List<ResourceTemplate> rtl = doSingleQueryRelay(h, relayMessage);
+                            if (!rtl.isEmpty())
+                                result.addAll(rtl);
+                        }
+                    }else {
+                        //random expand nodes in server list
+                        List<Host> copyserverlist = new LinkedList<Host>(serverList.getServerList());
+                        Collections.shuffle(copyserverlist);
+                        List<Host> subserverlist = copyserverlist.subList(0,Nodes.MAX_NODES_TO_EXPAND);
+                        for (Host h : subserverlist) {
+                            List<ResourceTemplate> rtl = doSingleQueryRelay(h, relayMessage);
+                            if (!rtl.isEmpty())
+                                result.addAll(rtl);
+                        }
                     }
-                    outputJsons.add(rt.toString());
+                    outputJsons.add(getSuccessMessageJson());
+                    for (ResourceTemplate rt : result) {
+                        if (!rt.getOwner().equals("")) {
+                            rt.setOwner("*");
+                        }
+                        outputJsons.add(rt.toString());
+                    }
+                    Nodes.logger.fine("Query relay Success");
                 }
                 outputJsons.add(getResultSizeJson(((long) result.size())));
-                Nodes.logger.fine("Query relay Success");
             }
         } catch (JsonSyntaxException e) {
             Nodes.logger.log(Level.WARNING, "{0} : missing resourceTemplate", this.ClientAddress);
             outputJsons.add(getErrorMessageJson("missing resourceTemplate"));
         }
-
     }
 
+    /*fetch file in local and forward if no match*/
     public void processFetch(List<String> outputJsons, String JSON) {
         try {
             FetchMessage fetchMessage = gson.fromJson(JSON, FetchMessage.class);
@@ -465,34 +470,82 @@ public class WorkerThread extends Thread {
                 throw new JsonSyntaxException("missing resource");
             }
             ResourceTemplate r = fetchMessage.getResource();
-
+            Nodes.logger.log(Level.INFO, "{0} fetching for {1}", new Object[]{client.getRemoteSocketAddress(), r.toString()});
             if (!fetchMessage.isValid()) {
                 Nodes.logger.log(Level.WARNING, "{0} : invalid resourceTemplate", this.ClientAddress);
                 outputJsons.add(getErrorMessageJson("invalid resourceTemplate"));
             } else {
+                //fetch relay will always be true until file reached or maximum hops reached
                 List<ResourceTemplate> result = this.fileList.fetch(r);
-
+                int mxHops = fetchMessage.getMxHops();
                 if (!result.isEmpty()) {
+                    Nodes.logger.log(Level.INFO,"fetching local");
+                    //download when file or maximum hops reached,leaf node or friend node only,since ultra node is empty
                     RandomAccessFile file;
                     file = new RandomAccessFile(new File(new URI(r.getUri()).getPath()), "r");
-
                     //file existed.
                     outputJsons.add(getSuccessMessageJson());
                     outputJsons.add(gson.toJson(new FileTemplate(result.get(0), file.length())));
-
                     file.close();
-
                     outputJsons.add(r.getUri());
-
                     outputJsons.add(getResultSizeJson((long) 1));
-
-                } else {
+                } else if (maxHops == 0) {
                     outputJsons.add(getSuccessMessageJson());
                     outputJsons.add(getResultSizeJson((long) 0));
                     Nodes.logger.log(Level.FINE, "{0} : no matched file", this.ClientAddress);
+                } else {
+                    //no local file reached but still have hops to relay
+                    FetchMessage relayFetchMessage = gson.fromJson(JSON, FetchMessage.class);
+                    relayFetchMessage.getResource().setOwner("");
+                    relayFetchMessage.getResource().setChannel("");
+                    relayFetchMessage.setMxHops(mxHops - 1);
+                    //append result set by fetching to remote servers
+                    /*to make sure it wont expand node more than limited*/
+                    Nodes.logger.log(Level.INFO, "{0} :command valid and relay true", this.serverList.getServerList());
+                    if (Nodes.MAX_NODES_TO_EXPAND >= this.serverList.getServerList().size()) {
+                        //if server list is smaller than nodes to expand
+                        for (Host h : this.serverList.getServerList()) {
+//                            Nodes.logger.log(Level.INFO, "{0} :fetch relay", h);
+                            List<ResourceTemplate> rtl = doSingleFetchRelay(h, fetchMessage);
+//                            Nodes.logger.log(Level.INFO, "{0} :single fetch relay result", rtl);
+                            if (!rtl.isEmpty()) {
+                                //eventually it will get an result list,download only once
+                                result.addAll(rtl);
+                                RandomAccessFile file;
+                                file = new RandomAccessFile(new File(new URI(r.getUri()).getPath()), "r");
+                                outputJsons.add(getSuccessMessageJson());
+                                outputJsons.add(gson.toJson(new FileTemplate(result.get(0), file.length())));
+                                file.close();
+//                                file.delete();
+                                outputJsons.add(r.getUri());
+                                outputJsons.add(getResultSizeJson((long) 1));
+                                break;//stop relay after one success reached
+                            }
+                        }
+                    } else {
+                        //random expand nodes in server list
+                        List<Host> copyserverlist = new LinkedList<Host>(serverList.getServerList());
+                        Collections.shuffle(copyserverlist);
+                        List<Host> subserverlist = copyserverlist.subList(0, Nodes.MAX_NODES_TO_EXPAND);
+                        for (Host h : subserverlist) {
+                            List<ResourceTemplate> rtl = doSingleFetchRelay(h, fetchMessage);
+                            if (!rtl.isEmpty()) {
+                                result.addAll(rtl);
+                                break;
+                            }
+                        }
+                    }//server list iteration ended
+                    outputJsons.add(getSuccessMessageJson());
+                    for (ResourceTemplate rt : result) {
+                        if (!rt.getOwner().equals("")) {
+                            rt.setOwner("*");
+                        }
+                        outputJsons.add(rt.toString());
+                    }
+                    Nodes.logger.fine("Fetch relay Success");
+                    outputJsons.add(getResultSizeJson(((long) result.size())));
                 }
-            }
-
+            }//relay succeed
         } catch (JsonSyntaxException e) {
             Nodes.logger.log(Level.WARNING, "{0} : missing resourceTemplate", this.ClientAddress);
             outputJsons.add(getErrorMessageJson("missing resourceTemplate"));
@@ -506,14 +559,47 @@ public class WorkerThread extends Thread {
             outputJsons.add(getErrorMessageJson("cannot fetch resource"));
         }
     }
+    private List<ResourceTemplate> doSingleFetchRelay(Host host, FetchMessage fetchMessage){
+        List<ResourceTemplate> result = new ArrayList<>();
+        try{
+            Socket socket = new Socket();
+            socket.connect(new InetSocketAddress(host.getHostname(), host.getPort()));
+            Nodes.logger.log(Level.FINE, "fetching to {0}", socket.getRemoteSocketAddress().toString());
+            socket.setSoTimeout(3000);
 
+            DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+            DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
+
+            String JSON = gson.toJson(fetchMessage);
+            Nodes.logger.log(Level.INFO, "fetching information {0}",JSON);
+            outputStream.writeUTF(JSON);
+            outputStream.flush();
+//            Nodes.logger.log(Level.INFO, "outputStream succeed!");
+            String response = inputStream.readUTF();
+//            Nodes.logger.log(Level.INFO, "inputStream succeed!");
+            if (response.contains("success")) {
+                response = inputStream.readUTF(); //discard success message.
+                ResourceTemplate r = gson.fromJson(response, ResourceTemplate.class);
+                result.add(r);//only one file could exist
+                Nodes.logger.log(Level.FINE, "successfully fetched {0}", socket.getRemoteSocketAddress().toString());
+            } else {
+                Nodes.logger.warning(response);
+            }
+            socket.close();
+        }catch (SocketTimeoutException e) {
+            Nodes.logger.log(Level.WARNING, "{0} timeout when fetch relay", host.toString());
+        } catch (ConnectException e) {
+            Nodes.logger.log(Level.WARNING, "{0} timeout when create relay socket", host.toString());
+        } catch (IOException e) {
+            Nodes.logger.log(Level.WARNING, "{0} IOException when fetch relay", host.toString());
+        }
+        return result;
+    }
     private List<ResourceTemplate> doSingleQueryRelay(Host host, QueryMessage queryMessage) {
         List<ResourceTemplate> result = new ArrayList<>();
-
         try {
             Socket socket = new Socket();
             socket.connect(new InetSocketAddress(host.getHostname(), host.getPort()));
-
             Nodes.logger.log(Level.FINE, "querying to {0}", socket.getRemoteSocketAddress().toString());
             socket.setSoTimeout(3000);
 
@@ -542,15 +628,10 @@ public class WorkerThread extends Thread {
 
         } catch (SocketTimeoutException e) {
             Nodes.logger.log(Level.WARNING, "{0} timeout when query relay", host.toString());
-            this.serverList.removeServer(host, secure);
         } catch (ConnectException e) {
             Nodes.logger.log(Level.WARNING, "{0} timeout when create relay socket", host.toString());
-//            Nodes.logger.info("server list now have :"+ this.serverList.getServerList());
-            this.serverList.removeServer(host, secure);
-//            Nodes.logger.info("server list then have :"+ this.serverList.getServerList());
         } catch (IOException e) {
             Nodes.logger.log(Level.WARNING, "{0} IOException when query relay", host.toString());
-            this.serverList.removeServer(host, secure);
         }
         return result;
     }
@@ -611,22 +692,5 @@ public class WorkerThread extends Thread {
         } catch (URISyntaxException ex) {
             Nodes.logger.log(Level.WARNING, "{0} : unable to create URI", this.ClientAddress);
         }
-    }
-
-    // For test
-    public boolean isSecure() {
-        return secure;
-    }
-
-    public void setSecure(boolean secure) {
-        this.secure = secure;
-    }
-
-    public Socket getClient() {
-        return client;
-    }
-
-    public void setClient(Socket client) {
-        this.client = client;
     }
 }
