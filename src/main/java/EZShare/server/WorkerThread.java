@@ -1,15 +1,18 @@
 package EZShare.server;
 
+import EZShare.RSA;
 import EZShare.message.*;
 import EZShare.Nodes;
 
 import java.io.*;
+import java.lang.reflect.Type;
 import java.net.*;
+import java.security.PublicKey;
 import java.util.*;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonIOException;
 import com.google.gson.JsonSyntaxException;
+
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
@@ -28,6 +31,7 @@ public class WorkerThread extends Thread {
     private String ClientAddress;
     private Gson gson = new Gson();
     private int maxHops;//maximum hops to visit
+    private KeyList keyList;
 
     /**
      * Initialize worker thread, create IO streams.
@@ -36,12 +40,13 @@ public class WorkerThread extends Thread {
      * @param fileList   reference of file list.
      * @param serverList reference of server list.
      */
-    public WorkerThread(Socket client, FileList fileList, ServerList serverList,boolean isUltraNode,int maxHops) {
+    public WorkerThread(Socket client, FileList fileList, ServerList serverList,boolean isUltraNode,int maxHops,KeyList keyList) {
         this.client = client;
         this.fileList = fileList;
         this.serverList = serverList;
         this.isUltraNode = isUltraNode;
         this.maxHops = maxHops;
+        this.keyList = keyList;
         Nodes.logger.log(Level.INFO, "is ultra node : {0}", this.isUltraNode);
         Nodes.logger.log(Level.INFO,"maximum hops to route:{0}",this.maxHops);
     }
@@ -116,6 +121,9 @@ public class WorkerThread extends Thread {
                     break;
                 case "EXCHANGE":
                     processExchange(outputJsons, inputJson);
+                    break;
+                case "EXCHANGEKEY":
+                    processKeyExchange(outputJsons,inputJson);
                     break;
                 case "FETCH":
                     processFetch(outputJsons, inputJson);
@@ -369,6 +377,7 @@ public class WorkerThread extends Thread {
 
     /*exchange no need to change,used for connecting nodes*/
     public void processExchange(List<String> outputJsons, String JSON) {
+//        System.out.println(JSON);
         try {
             ExchangeMessage exchangeMessage = gson.fromJson(JSON, ExchangeMessage.class);
 
@@ -394,6 +403,34 @@ public class WorkerThread extends Thread {
         }
     }
 
+    public void processKeyExchange(List<String> outputJsons, String JSON){
+        System.out.println("keylist class:"+ ExchangeKeyList.class);
+//        System.out.println(gson.fromJson(JSON,ExchangeKeyList.class));
+//        System.out.println("processKeyExchange");
+//        ExchangeKeyList exchangeKeyList = gson.fromJson(JSON,ExchangeKeyList.class);
+//        System.out.println("processKeyExchange1");
+        try{
+//            Type exchangekeylisttype = new TypeToken<ConcurrentHashMap<String,PublicKey>>(){}.getType();
+//            ExchangeKeyList exchangeKeyList = gson.fromJson(JSON,exchangekeylisttype);
+            ExchangeKeyList exchangeKeyList = gson.fromJson(JSON,ExchangeKeyList.class);
+            System.out.println(exchangeKeyList);
+            if (exchangeKeyList.getKeyList() == null || exchangeKeyList.getKeyList().isEmpty()) {
+                throw new JsonSyntaxException("missing keys");
+            }
+            ConcurrentHashMap<String, PublicKey> inputKeyList = exchangeKeyList.getKeyList();
+            System.out.println(inputKeyList);
+            if (exchangeKeyList.isValid()){
+                this.keyList.updateKeyList(inputKeyList);
+                Nodes.logger.log(Level.FINE, "{0} : keys added", this.ClientAddress);
+                outputJsons.add(getSuccessMessageJson());
+            }else {
+                outputJsons.add(getErrorMessageJson("invalid server record"));
+            }
+        } catch (JsonSyntaxException e) {
+            Nodes.logger.log(Level.WARNING, "{0} : missing or invalid key list", this.ClientAddress);
+            outputJsons.add(getErrorMessageJson("missing or invalid key list"));
+        }
+    }
     /*query done*/
     public void processQuery(List<String> outputJsons, String JSON) {
         try {
@@ -479,6 +516,10 @@ public class WorkerThread extends Thread {
                 List<ResourceTemplate> result = this.fileList.fetch(r);
                 int mxHops = fetchMessage.getMxHops();
                 if (!result.isEmpty()) {
+                    //only one result could be possible
+                    //to anonymous all nodes channel and owner
+                    if (!result.get(0).getOwner().equals("")){result.get(0).setOwner("*");}
+//                    if (!result.get(0).getChannel().equals("")) {result.get(0).setChannel("*");}//larry added
                     Nodes.logger.log(Level.INFO,"fetching local");
                     //download when file or maximum hops reached,leaf node or friend node only,since ultra node is empty
                     RandomAccessFile file;
@@ -496,55 +537,47 @@ public class WorkerThread extends Thread {
                 } else {
                     //no local file reached but still have hops to relay
                     FetchMessage relayFetchMessage = gson.fromJson(JSON, FetchMessage.class);
-                    relayFetchMessage.getResource().setOwner("");
-                    relayFetchMessage.getResource().setChannel("");
+//                    relayFetchMessage.getResource().setOwner("");
+//                    relayFetchMessage.getResource().setChannel("");
                     relayFetchMessage.setMxHops(mxHops - 1);
                     //append result set by fetching to remote servers
                     /*to make sure it wont expand node more than limited*/
                     Nodes.logger.log(Level.INFO, "{0} :command valid and relay true", this.serverList.getServerList());
-                    if (Nodes.MAX_NODES_TO_EXPAND >= this.serverList.getServerList().size()) {
-                        //if server list is smaller than nodes to expand
-                        for (Host h : this.serverList.getServerList()) {
-//                            Nodes.logger.log(Level.INFO, "{0} :fetch relay", h);
-                            List<ResourceTemplate> rtl = doSingleFetchRelay(h, fetchMessage);
-//                            Nodes.logger.log(Level.INFO, "{0} :single fetch relay result", rtl);
-                            if (!rtl.isEmpty()) {
-                                //eventually it will get an result list,download only once
-                                result.addAll(rtl);
-                                RandomAccessFile file;
-                                file = new RandomAccessFile(new File(new URI(r.getUri()).getPath()), "r");
-                                outputJsons.add(getSuccessMessageJson());
-                                outputJsons.add(gson.toJson(new FileTemplate(result.get(0), file.length())));
-                                file.close();
-//                                file.delete();
-                                outputJsons.add(r.getUri());
-                                outputJsons.add(getResultSizeJson((long) 1));
-                                break;//stop relay after one success reached
-                            }
-                        }
-                    } else {
-                        //random expand nodes in server list
-                        List<Host> copyserverlist = new LinkedList<Host>(serverList.getServerList());
+                    List<Host> serverListToRelay;
+                    if (Nodes.MAX_NODES_TO_EXPAND >= this.serverList.getServerList().size()){
+                        serverListToRelay = this.serverList.getServerList();
+                    }else {
+                        List<Host> copyserverlist = new LinkedList<>(serverList.getServerList());
                         Collections.shuffle(copyserverlist);
-                        List<Host> subserverlist = copyserverlist.subList(0, Nodes.MAX_NODES_TO_EXPAND);
-                        for (Host h : subserverlist) {
-                            List<ResourceTemplate> rtl = doSingleFetchRelay(h, fetchMessage);
-                            if (!rtl.isEmpty()) {
-                                result.addAll(rtl);
-                                break;
-                            }
-                        }
-                    }//server list iteration ended
-                    outputJsons.add(getSuccessMessageJson());
-                    for (ResourceTemplate rt : result) {
-                        if (!rt.getOwner().equals("")) {
-                            rt.setOwner("*");
-                        }
-                        outputJsons.add(rt.toString());
+                        serverListToRelay = copyserverlist.subList(0, Nodes.MAX_NODES_TO_EXPAND);
                     }
-                    Nodes.logger.fine("Fetch relay Success");
-                    outputJsons.add(getResultSizeJson(((long) result.size())));
-                }
+                    boolean fileFound = false;
+                    for (Host h : serverListToRelay) {
+                        List<ResourceTemplate> rtl = doSingleFetchRelay(h, fetchMessage);
+//                        System.out.println("result is empty"+rtl.isEmpty());
+                        if (!rtl.isEmpty()) {
+                            //eventually if it will get an result list,download only once
+                            if (!rtl.get(0).getOwner().equals("")){rtl.get(0).setOwner("*");}
+//                            if (!rtl.get(0).getChannel().equals("")) {rtl.get(0).setChannel("*");}//larry added
+                            Nodes.logger.log(Level.INFO,"fetching relay");
+                            RandomAccessFile file;
+                            file = new RandomAccessFile(new File(new URI(r.getUri()).getPath()), "r");
+                            outputJsons.add(getSuccessMessageJson());
+                            outputJsons.add(gson.toJson(new FileTemplate(rtl.get(0), file.length())));
+                            file.close();
+                            outputJsons.add(r.getUri());
+                            outputJsons.add(getResultSizeJson((long) 1));
+                            fileFound = true;
+                            break;//stop relay after one success reached
+                        }
+                    }
+                    //still if no matched file found
+                    if(!fileFound){
+                        outputJsons.add(getSuccessMessageJson());
+                        outputJsons.add(getResultSizeJson((long) 0));
+                        Nodes.logger.log(Level.FINE, "{0} : no matched file", this.ClientAddress);
+                    }
+                }//server list iteration ended
             }//relay succeed
         } catch (JsonSyntaxException e) {
             Nodes.logger.log(Level.WARNING, "{0} : missing resourceTemplate", this.ClientAddress);
@@ -577,11 +610,17 @@ public class WorkerThread extends Thread {
 //            Nodes.logger.log(Level.INFO, "outputStream succeed!");
             String response = inputStream.readUTF();
 //            Nodes.logger.log(Level.INFO, "inputStream succeed!");
+
             if (response.contains("success")) {
                 response = inputStream.readUTF(); //discard success message.
-                ResourceTemplate r = gson.fromJson(response, ResourceTemplate.class);
-                result.add(r);//only one file could exist
+                while (!response.contains("resultSize")) {   //only read resource part.
+                    ResourceTemplate r = gson.fromJson(response, ResourceTemplate.class);
+                    result.add(r);
+                    response = inputStream.readUTF();   //read next response.
+                }
                 Nodes.logger.log(Level.FINE, "successfully fetched {0}", socket.getRemoteSocketAddress().toString());
+                Nodes.logger.log(Level.FINE, "nunmber of result fetched {0}", result.size());
+                Nodes.logger.log(Level.FINE, "result returned {0}", result);
             } else {
                 Nodes.logger.warning(response);
             }
@@ -665,6 +704,7 @@ public class WorkerThread extends Thread {
     private void sendBackMessage(List<String> jsons) {
         try {
             for (String json : jsons) {
+                System.out.println("sendbackJson:"+json);
                 /* If json.length() == 0 (barely happens), do nothing at the moment. */
                 if (json.length() != 0) {
                     /* Let's assume that: If the string is not a json object, it must be a file URI. */

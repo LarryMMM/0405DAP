@@ -2,18 +2,18 @@ package EZShare;
 
 import EZShare.log.LogCustomFormatter;
 import EZShare.message.*;
-import EZShare.server.FileList;
-import EZShare.server.ServerList;
-import EZShare.server.Subscription;
-import EZShare.server.WorkerThread;
+import EZShare.server.*;
 import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import org.apache.commons.cli.*;
 
 import javax.net.ServerSocketFactory;
 import java.io.*;
+import java.lang.reflect.Type;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.security.PublicKey;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -34,7 +34,7 @@ public class Nodes {
     public static long EXCHANGE_PERIOD = 600000;
     public static boolean isUltraNode = false;
     public static final int TIME_OUT = 30000;//each connection time out
-    public static final String download_path = "Downloads/";
+    public static final String download_path = "./Downloads/lf1Fetch/";
     public static final int MAX_NODES_TO_EXPAND = 4;//maximum nodes for one hop to visit
     public static final int MAX_HOPS = 7;
     /* Data structures and utilities */
@@ -42,7 +42,7 @@ public class Nodes {
     private static final ServerList serverList = new ServerList();
     public static final Logger logger = LogCustomFormatter.getLogger(Nodes.class.getName());
     private static final Gson gson = new Gson();
-
+    private static final KeyList keyList = new KeyList();
     /*
      A HashMap to record the mapping from a specified client to the starting time of its last connection
  */
@@ -86,8 +86,8 @@ public class Nodes {
         options.addOption("tags", true, "resource tags, tag1,tag2,tag3,...");
         options.addOption("uri", true, "resource URI");
         options.addOption("help", false, "help");
-
         options.addOption("isUltraNode",true,"set as ultra node");
+        options.addOption("exchangeKey",false,"exchange keys to server:host1,pubkey1,host2,pubkey2,...");
         //parse command line arguments
         return options;
     }
@@ -114,6 +114,9 @@ public class Nodes {
     private static boolean optionsValidator(CommandLine line) {
         //make sure only one command option appears in commandline args
         int count = 0;
+        if (line.hasOption("exchangeKey")){
+            count++;
+        }
         if (line.hasOption("query")) {
             count++;
         }
@@ -338,8 +341,9 @@ public class Nodes {
         logger.fine("exchanging to :" + socket.getRemoteSocketAddress());
 
         ExchangeMessage exchangeMessage = new ExchangeMessage(serverList);
-
         String JSON = gson.toJson(exchangeMessage);
+
+//        System.out.println("gson.toJson"+JSON);
         sendMessage(output, JSON);
 
         String response = input.readUTF();
@@ -352,6 +356,31 @@ public class Nodes {
 
     }
 
+    private static void exchangeKeyCommand(Socket socket,ConcurrentHashMap<String,PublicKey> keyList) throws IOException {
+        socket.setSoTimeout(TIME_OUT);
+        DataInputStream input = new DataInputStream(socket.getInputStream());
+        DataOutputStream output = new DataOutputStream(socket.getOutputStream());
+
+        logger.fine("exchanging keyList to :" + socket.getRemoteSocketAddress());
+
+        ExchangeKeyList exchangeKeyList = new ExchangeKeyList(keyList);
+        System.out.println("key list class:"+exchangeKeyList.getKeyList());
+        System.out.println("keys:"+exchangeKeyList.getKeyList().keySet());
+        String JSON = gson.toJson(exchangeKeyList);
+        System.out.println("JSON:"+JSON);
+        Type exchangekeylisttype = new TypeToken<ConcurrentHashMap<String,PublicKey>>(){}.getType();
+        System.out.println("type:"+exchangekeylisttype);
+//        System.out.println(gson.fromJson(JSON,exchangekeylisttype));
+        sendMessage(output, JSON);
+
+        String response = input.readUTF();
+        if (response.contains("error")) {
+            logger.warning("RECEIVED:" + response);
+        }
+        if (response.contains("success")) {
+            logger.fine("RECEIVED:" + response);
+        }
+    }
     /**
      * Process fetch command.
      *
@@ -372,7 +401,6 @@ public class Nodes {
 
         String response = input.readUTF();
         if (response.contains("success")) {
-
             logger.fine("RECEIVED:" + response);
             //try to read file template
             String file_template = input.readUTF();
@@ -388,14 +416,14 @@ public class Nodes {
                 int resource_size = (int) receivedFileTemplate.getResourceSize();
 
                 String name = new File(receivedFileTemplate.getUri()).getName();
-                //System.out.println(name);
+//                System.out.println(name);
 
                 //check download directory
                 File download_directory = new File(download_path);
                 if (!download_directory.exists()) {
                     download_directory.mkdir();
                 }
-
+//                System.out.println("downloadpath"+download_path);
                 //create file
                 RandomAccessFile randomAccessFile = new RandomAccessFile(download_path + name, "rw");
 
@@ -440,13 +468,10 @@ public class Nodes {
                 logger.fine("RECEIVED:" + response);
 
             }
-
         } else if (response.contains("error")) {
             logger.warning("RECEIVED:" + response);
         }
-
     }
-
     /**
      * Process subscribe command.
      *
@@ -557,7 +582,7 @@ public class Nodes {
                                 /* Assign a worker thread for this socket. */
 //                                System.out.println("begin test for threadpool");
                                 try {
-                                    Nodes.threadPool.submit(new WorkerThread(client, fileList, serverList, isUltraNode,MAX_HOPS));
+                                    Nodes.threadPool.submit(new WorkerThread(client, fileList, serverList, isUltraNode,MAX_HOPS,keyList));
                                 }catch (Exception e) {
                                     e.printStackTrace();
                                     logger.log(Level.WARNING, "{0} cannot create stream", client.getRemoteSocketAddress().toString());
@@ -605,6 +630,7 @@ public class Nodes {
             //proceed commands
             String error_message = null;    //error message when command line options missing
 
+
             if (cmdLine.hasOption("query")) {
                 queryCommand(socket, resourceTemplate);
             }//should be fine @larry
@@ -648,7 +674,28 @@ public class Nodes {
                     exchangeCommand(socket, serverList);
                 }
             }
-
+            if (cmdLine.hasOption("exchangeKey")){
+                if (!cmdLine.hasOption("servers")) {
+                    error_message = "servers missing!";
+                } else {
+                    //parse commandline args to host list
+                    String[] s = cmdLine.getOptionValue("servers").split(",");
+                    ConcurrentHashMap<String,PublicKey> keyList = new ConcurrentHashMap<>();
+                    for (String server : s) {
+                        RSA hostRSA = new RSA(server);
+                        keyList.put(server,hostRSA.getPublicKey());
+//                        List<Host> listTest = new ArrayList<>();
+//                        listTest.add(inHost);
+//                        System.out.println("inhost Array"+inHost);
+//                        System.out.println("inhost"+inHost);
+//                        System.out.println("RSA ClientID"+hostRSA.getID());
+//                        System.out.println("pubkey"+hostRSA.getPublicKey());
+//                        System.out.println("keyset"+keyList.keySet());
+//                        System.out.println("keylist"+keyList);
+                    }
+                    exchangeKeyCommand(socket,keyList);
+                }
+            }
             if (cmdLine.hasOption("fetch")) {
                 if (!cmdLine.hasOption("uri")) {
                     error_message = "URI is missing.";
@@ -678,6 +725,7 @@ public class Nodes {
 
     public static void main(String[] args) {
         logger.info("Starting the EZShare F2F system and initialise node");
+
         /*parse arguments*/
         CommandLineParser parser = new DefaultParser();
         Options options = commandOptions();

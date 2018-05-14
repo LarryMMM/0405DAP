@@ -1,6 +1,9 @@
 package EZShare.message;
 
 
+import java.security.PrivateKey;
+import java.security.PublicKey;
+
 /**
  * Encapsulation of Query Command.
  * Created by jason on 9/4/17.

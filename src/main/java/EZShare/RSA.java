@@ -1,4 +1,6 @@
 package EZShare;
+import EZShare.message.Host;
+
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
@@ -92,22 +94,52 @@ public class RSA {
     public RSA(){
         this.pubKey = (PublicKey) getKeyPair("RSA").get(0);
         this.pvtKey = (PrivateKey)getKeyPair("RSA").get(1);
-//        saveKeyPair(getKeyPair("RSA"),id);
+        saveKeyPair(getKeyPair("RSA"),id.toString().replace(":",","));
     }
 
     public RSA(String clientId){
-        //RSA KEY GENERATION
-        this.pubKey = (PublicKey) getKeyPair("RSA").get(0);
-        this.pvtKey = (PrivateKey)getKeyPair("RSA").get(1);
+        String keyName = clientId.replace(":", ",");
+        Path keyFilePath = Paths.get(keyName+"pub.txt");
+        if(Files.exists(keyFilePath)){
+            this.pubKey = loadPublicKey(keyName,"RSA");
+            Path keyFilePath2 = Paths.get(keyName+"pvt.txt");
+            if (Files.exists(keyFilePath2)){this.pvtKey = loadPrivateKey(keyName,"RSA");}
+            System.out.println(this.pubKey);
+            this.id = clientId;
+        }else {
+            //RSA KEY GENERATION
+            this.pubKey = (PublicKey) getKeyPair("RSA").get(0);
+            this.pvtKey = (PrivateKey)getKeyPair("RSA").get(1);
+            saveKeyPair(getKeyPair("RSA"),keyName);
+        }
         this.id = clientId;
-        saveKeyPair(getKeyPair("RSA"),id);
     }
+
+//    public RSA(Host clientId){
+//        String keyName = clientId.toString().replace(":", ",");
+//        Path keyFilePath = Paths.get(keyName+"pub.txt");
+//        if(Files.exists(keyFilePath)){
+//            this.pubKey = loadPublicKey(keyName,"RSA");
+//            System.out.println(this.pubKey);
+//            Path keyFilePath2 = Paths.get(keyName+"pvt.txt");
+//            if (Files.exists(keyFilePath2)){this.pvtKey = loadPrivateKey(keyName,"RSA");
+//        }else {
+//            //RSA KEY GENERATION
+//            this.pubKey = (PublicKey) getKeyPair("RSA").get(0);
+//            this.pvtKey = (PrivateKey)getKeyPair("RSA").get(1);
+//            saveKeyPairText(getKeyPair("RSA"),keyName);
+//        }
+//        this.id = clientId;
+//        }
+//    }
+
     private static ArrayList<Key> getKeyPair(String algorithm){
         try {
             ArrayList<Key> keyPair = new ArrayList<>();
             //RSA KEY GENERATION
             KeyPairGenerator kpg = KeyPairGenerator.getInstance(algorithm);
             kpg.initialize(2048);//initialize with key size
+//            kpg.initialize(512);//initialize with key size
             KeyPair kp = kpg.generateKeyPair();
             Key pub = kp.getPublic();
             Key pvt = kp.getPrivate();
@@ -126,11 +158,11 @@ public class RSA {
         try{
             Key pub = keyPair.get(0);
             Key pvt = keyPair.get(1);
-            OutputStream saveKey = new FileOutputStream(keyName + ".pvt");
+            OutputStream saveKey = new FileOutputStream(keyName + "pvt.txt");
             saveKey.write(pvt.getEncoded());
             saveKey.close();
 
-            saveKey = new FileOutputStream(keyName + ".pub");
+            saveKey = new FileOutputStream(keyName + "pub.txt");
             saveKey.write(pub.getEncoded());
             saveKey.close();
             //RSA FORMAT CHECK
@@ -144,6 +176,41 @@ public class RSA {
         }
     }
 //save RSA KEY
+    private static PrivateKey loadPrivateKey(String keyName,String algorithm){
+        try {
+            Path keyFilePath = Paths.get(keyName + "pvt.txt");
+            byte[] loadKeyByte = Files.readAllBytes(keyFilePath);
+            /* Generate private key. */
+            PKCS8EncodedKeySpec ksPvt = new PKCS8EncodedKeySpec(loadKeyByte);
+            KeyFactory kf = KeyFactory.getInstance(algorithm);
+            PrivateKey pvtKey = kf.generatePrivate(ksPvt);
+            return pvtKey;
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (InvalidKeySpecException e) {
+            e.printStackTrace();
+        }return null;
+    }
+    private static PublicKey loadPublicKey(String keyName,String algorithm){
+        try {
+            /* Read all the public key bytes */
+            Path keyFilePath = Paths.get(keyName + "pub.txt");
+            byte[] loadKeyByte = Files.readAllBytes(keyFilePath);
+            /* Generate public key. */
+            X509EncodedKeySpec ksPub = new X509EncodedKeySpec(loadKeyByte);
+            KeyFactory kf = KeyFactory.getInstance(algorithm);
+            PublicKey pubKey = kf.generatePublic(ksPub);
+            return pubKey;
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (InvalidKeySpecException e) {
+            e.printStackTrace();
+        }return null;
+    }
     private static ArrayList<Key> loadKeyPair(String keyName,String algorithm){
         try{
             ArrayList<Key> keyPair = new ArrayList<>();
@@ -191,13 +258,13 @@ public class RSA {
             PublicKey pubKey = (PublicKey) keyPair.get(0);
             PrivateKey pvtKey = (PrivateKey) keyPair.get(1);
             Base64.Encoder encoder = Base64.getEncoder();//java provided
-            Writer saveKeyText = new FileWriter(keyNameText + ".pvt");
+            Writer saveKeyText = new FileWriter(keyNameText + "pvt.txt");
             saveKeyText.write("-----BEGIN RSA PRIVATE KEY-----\\n");
             saveKeyText.write(encoder.encodeToString(pvtKey.getEncoded()));
             saveKeyText.write("-----END RSA PRIVATE KEY-----\\n");
             saveKeyText.close();
             System.err.println("save private key text succeeded!");
-            saveKeyText = new FileWriter(keyNameText + ".pub");
+            saveKeyText = new FileWriter(keyNameText + "pub.txt");
             saveKeyText.write("-----BEGIN RSA PUBLIC KEY-----\\n");
             saveKeyText.write(encoder.encodeToString(pubKey.getEncoded()));
             saveKeyText.write("-----END RSA PUBLIC KEY-----\\n");
@@ -295,5 +362,63 @@ public class RSA {
         return false;
     }
 //verify signature
-
+//    public static String encryptCommand(String keyName,String algorithm,String command){
+//        return encryptMessage();
+//    }//encrypt command message and sign signature
+//    public static String decryptResponse(){
+//
+//    }
+//    public static String encryptJson(String keyName, String algorithm, String Json){
+//        try {
+//            ArrayList<Key> KeyPair = RSA.loadKeyPair(keyName, algorithm);
+//            PublicKey pubKey = (PublicKey)KeyPair.get(0);
+//            PrivateKey pvtKey = (PrivateKey)KeyPair.get(1);
+//            String encryptJson = encryptMessage(pubKey,algorithm, Json).toString();
+//            String signature = getSignatureMessage(pvtKey,"SHA256withRSA",encryptJson.getBytes()).toString();
+//
+//            return encryptJson+",,,,"+signature;
+//
+//        } catch (NoSuchAlgorithmException e) {
+//            e.printStackTrace();
+//        } catch (BadPaddingException e) {
+//            e.printStackTrace();
+//        } catch (IllegalBlockSizeException e) {
+//            e.printStackTrace();
+//        } catch (NoSuchPaddingException e) {
+//            e.printStackTrace();
+//        } catch (InvalidKeyException e) {
+//            e.printStackTrace();
+//        }
+//        return null;
+//}
+//
+//    public static String decryptJson(String keyName, String algorithm, byte[] cipherMessage){
+//        try{
+//            ArrayList<Key> KeyPair = RSA.loadKeyPair(keyName, algorithm);
+//            PrivateKey pvtKey = (PrivateKey) KeyPair.get(1);
+//            PublicKey pubKey = (PublicKey)KeyPair.get(0);
+//            String decryptJson = decryptMessage(pvtKey,algorithm,cipherMessage);
+//            String[] parts= decryptJson.split(",,,,");
+//            String Json = parts[0];
+//            String signature = parts[1];
+//            boolean verifysign = verifySignatureMessage(pubKey,"SHA256withRSA",Json,signature.getBytes());
+//            if(verifysign){
+//                return Json;
+//            }
+//            else
+//                return null;
+//
+//        } catch (NoSuchPaddingException e) {
+//            e.printStackTrace();
+//        } catch (NoSuchAlgorithmException e) {
+//            e.printStackTrace();
+//        } catch (InvalidKeyException e) {
+//            e.printStackTrace();
+//        } catch (IllegalBlockSizeException e) {
+//            e.printStackTrace();
+//        } catch (BadPaddingException e) {
+//            e.printStackTrace();
+//        }
+//        return null;
+//    }
 }
