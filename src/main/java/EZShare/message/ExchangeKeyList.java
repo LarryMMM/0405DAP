@@ -1,21 +1,21 @@
 package EZShare.message;
 
-import java.security.PublicKey;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class ExchangeKeyList{
-    private final ConcurrentHashMap<String,PublicKey> keyList;
-    private final String command ;
-    public ExchangeKeyList(ConcurrentHashMap<String,PublicKey> keyList){
+public class ExchangeKeyList extends Message{
+//    private final ConcurrentHashMap<String,PublicKey> keyList;
+private final ConcurrentHashMap<String,String> keyList;
+    public ExchangeKeyList(ConcurrentHashMap<String,String> keyList){
+        super("EXCHANGEKEY");
         this.keyList = keyList;
-        this.command = "EXCHANGEKEY";
     }
-    public String getCommand() {
-        return command;
-    }
-    public ConcurrentHashMap<String,PublicKey> getKeyList() {
-        return keyList;
-    }
+//    public ExchangeKeyList(ConcurrentHashMap<String,PublicKey> keyList){
+//        super("EXCHANGEKEY");
+//        this.keyList = keyList;
+//    }
+
+//    public ConcurrentHashMap<String,PublicKey> getKeyList() {return keyList;}
+    public ConcurrentHashMap<String,String> getKeyList() {return keyList;}
 
     public boolean isValid() {
         for (String s: keyList.keySet()) {
@@ -27,4 +27,5 @@ public class ExchangeKeyList{
         }
         return true;
     }
+
 }

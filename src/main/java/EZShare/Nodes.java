@@ -4,12 +4,10 @@ import EZShare.log.LogCustomFormatter;
 import EZShare.message.*;
 import EZShare.server.*;
 import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 import org.apache.commons.cli.*;
 
 import javax.net.ServerSocketFactory;
 import java.io.*;
-import java.lang.reflect.Type;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -208,8 +206,13 @@ public class Nodes {
         logger.fine("querying to :" + socket.getRemoteSocketAddress());
 
         QueryMessage queryMessage = new QueryMessage(resourceTemplate, true, MAX_HOPS);
-
         String JSON = gson.toJson(queryMessage);
+
+//        RSA target = new RSA(String.valueOf(socket.getRemoteSocketAddress()));//will check RSA keys
+//        String encryptedMessage =target.encryptJson(target.getID(),"RSA",JSON);
+//        target.getSignatureMessage(target.getPrivateKey());
+//        sendMessage(output, encryptedJson);
+
         sendMessage(output, JSON);
 
         String response = input.readUTF();
@@ -356,7 +359,8 @@ public class Nodes {
 
     }
 
-    private static void exchangeKeyCommand(Socket socket,ConcurrentHashMap<String,PublicKey> keyList) throws IOException {
+//    private static void exchangeKeyCommand(Socket socket,ConcurrentHashMap<String,PublicKey> keyList) throws IOException {
+    private static void exchangeKeyCommand(Socket socket,ConcurrentHashMap<String,String> keyList) throws IOException {
         socket.setSoTimeout(TIME_OUT);
         DataInputStream input = new DataInputStream(socket.getInputStream());
         DataOutputStream output = new DataOutputStream(socket.getOutputStream());
@@ -364,13 +368,10 @@ public class Nodes {
         logger.fine("exchanging keyList to :" + socket.getRemoteSocketAddress());
 
         ExchangeKeyList exchangeKeyList = new ExchangeKeyList(keyList);
-        System.out.println("key list class:"+exchangeKeyList.getKeyList());
-        System.out.println("keys:"+exchangeKeyList.getKeyList().keySet());
+
         String JSON = gson.toJson(exchangeKeyList);
-        System.out.println("JSON:"+JSON);
-        Type exchangekeylisttype = new TypeToken<ConcurrentHashMap<String,PublicKey>>(){}.getType();
-        System.out.println("type:"+exchangekeylisttype);
-//        System.out.println(gson.fromJson(JSON,exchangekeylisttype));
+
+//        System.out.println("JSON:"+JSON);
         sendMessage(output, JSON);
 
         String response = input.readUTF();
@@ -381,6 +382,7 @@ public class Nodes {
             logger.fine("RECEIVED:" + response);
         }
     }
+
     /**
      * Process fetch command.
      *
@@ -680,18 +682,11 @@ public class Nodes {
                 } else {
                     //parse commandline args to host list
                     String[] s = cmdLine.getOptionValue("servers").split(",");
-                    ConcurrentHashMap<String,PublicKey> keyList = new ConcurrentHashMap<>();
+//                    ConcurrentHashMap<String,PublicKey> keyList = new ConcurrentHashMap<>();
+                    ConcurrentHashMap<String,String> keyList = new ConcurrentHashMap<>();
                     for (String server : s) {
                         RSA hostRSA = new RSA(server);
                         keyList.put(server,hostRSA.getPublicKey());
-//                        List<Host> listTest = new ArrayList<>();
-//                        listTest.add(inHost);
-//                        System.out.println("inhost Array"+inHost);
-//                        System.out.println("inhost"+inHost);
-//                        System.out.println("RSA ClientID"+hostRSA.getID());
-//                        System.out.println("pubkey"+hostRSA.getPublicKey());
-//                        System.out.println("keyset"+keyList.keySet());
-//                        System.out.println("keylist"+keyList);
                     }
                     exchangeKeyCommand(socket,keyList);
                 }

@@ -1,5 +1,6 @@
 package EZShare.message;
 
+import EZShare.encryptMessage.EncryptMessage;
 import com.google.gson.Gson;
 
 /**
@@ -7,7 +8,7 @@ import com.google.gson.Gson;
  * Created by jason on 10/4/17.
  */
 public class Message extends Validatable {
-    private static final String[] valid_commands = {"QUERY","SHARE","PUBLISH","REMOVE","EXCHANGE","FETCH"};
+    private static final String[] valid_commands = {"QUERY","SHARE","PUBLISH","REMOVE","EXCHANGE","FETCH","EXCHANGEKEY"};
 
     private final String command;
 

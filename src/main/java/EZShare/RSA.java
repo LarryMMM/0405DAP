@@ -81,35 +81,38 @@ public class RSA {
 //        System.out.println(outputMessage);
 //    }
 
-
-    private PublicKey pubKey;
-    private PrivateKey pvtKey;
+    private String pubKey;
+//    private PublicKey pubKey;
+    private String pvtKey;
     private String id;
 
     public String getID(){
         return this.id;
     }
-    public PublicKey getPublicKey(){ return this.pubKey; }
-    public PrivateKey getPrivateKey(){return this.pvtKey;}
-    public RSA(){
-        this.pubKey = (PublicKey) getKeyPair("RSA").get(0);
-        this.pvtKey = (PrivateKey)getKeyPair("RSA").get(1);
-        saveKeyPair(getKeyPair("RSA"),id.toString().replace(":",","));
-    }
+    public String getPublicKey(){ return this.pubKey; }
+    public String getPrivateKey(){return this.pvtKey;}
+
+//    public RSA(){
+//        this.pubKey = (PublicKey) getKeyPair("RSA").get(0);
+//        this.pvtKey = (PrivateKey)getKeyPair("RSA").get(1);
+//        saveKeyPair(getKeyPair("RSA"),id.toString().replace(":",","));
+//    }
 
     public RSA(String clientId){
         String keyName = clientId.replace(":", ",");
         Path keyFilePath = Paths.get(keyName+"pub.txt");
         if(Files.exists(keyFilePath)){
-            this.pubKey = loadPublicKey(keyName,"RSA");
+            Base64.Encoder encoder = Base64.getEncoder();//java provided
+            this.pubKey = encoder.encodeToString(loadPublicKey(keyName,"RSA").getEncoded());
             Path keyFilePath2 = Paths.get(keyName+"pvt.txt");
-            if (Files.exists(keyFilePath2)){this.pvtKey = loadPrivateKey(keyName,"RSA");}
-            System.out.println(this.pubKey);
+            if (Files.exists(keyFilePath2)){this.pvtKey =encoder.encodeToString(loadPrivateKey(keyName,"RSA").getEncoded());}
+//            System.out.println(this.pubKey);
             this.id = clientId;
         }else {
             //RSA KEY GENERATION
-            this.pubKey = (PublicKey) getKeyPair("RSA").get(0);
-            this.pvtKey = (PrivateKey)getKeyPair("RSA").get(1);
+            Base64.Encoder encoder = Base64.getEncoder();//java provided
+            this.pubKey = encoder.encodeToString(((PublicKey) getKeyPair("RSA").get(0)).getEncoded());
+            this.pvtKey = encoder.encodeToString(((PrivateKey)getKeyPair("RSA").get(1)).getEncoded());
             saveKeyPair(getKeyPair("RSA"),keyName);
         }
         this.id = clientId;
@@ -161,7 +164,7 @@ public class RSA {
             OutputStream saveKey = new FileOutputStream(keyName + "pvt.txt");
             saveKey.write(pvt.getEncoded());
             saveKey.close();
-
+            System.out.println(pvt.getEncoded().getClass().getName());
             saveKey = new FileOutputStream(keyName + "pub.txt");
             saveKey.write(pub.getEncoded());
             saveKey.close();
@@ -214,14 +217,14 @@ public class RSA {
     private static ArrayList<Key> loadKeyPair(String keyName,String algorithm){
         try{
             ArrayList<Key> keyPair = new ArrayList<>();
-            Path keyFilePath = Paths.get(keyName + ".pvt");
+            Path keyFilePath = Paths.get(keyName + "pvt.txt");
             byte[] loadKeyByte = Files.readAllBytes(keyFilePath);
             /* Generate private key. */
             PKCS8EncodedKeySpec ksPvt= new PKCS8EncodedKeySpec(loadKeyByte);
             KeyFactory kf = KeyFactory.getInstance(algorithm);
             PrivateKey pvtKey = kf.generatePrivate(ksPvt);
             /* Read all the public key bytes */
-            keyFilePath = Paths.get(keyName + ".pub");
+            keyFilePath = Paths.get(keyName + "pub.txt");
             loadKeyByte = Files.readAllBytes(keyFilePath);
             /* Generate public key. */
             X509EncodedKeySpec ksPub = new X509EncodedKeySpec(loadKeyByte);
@@ -368,30 +371,25 @@ public class RSA {
 //    public static String decryptResponse(){
 //
 //    }
-//    public static String encryptJson(String keyName, String algorithm, String Json){
-//        try {
-//            ArrayList<Key> KeyPair = RSA.loadKeyPair(keyName, algorithm);
-//            PublicKey pubKey = (PublicKey)KeyPair.get(0);
-//            PrivateKey pvtKey = (PrivateKey)KeyPair.get(1);
-//            String encryptJson = encryptMessage(pubKey,algorithm, Json).toString();
-//            String signature = getSignatureMessage(pvtKey,"SHA256withRSA",encryptJson.getBytes()).toString();
-//
-//            return encryptJson+",,,,"+signature;
-//
-//        } catch (NoSuchAlgorithmException e) {
-//            e.printStackTrace();
-//        } catch (BadPaddingException e) {
-//            e.printStackTrace();
-//        } catch (IllegalBlockSizeException e) {
-//            e.printStackTrace();
-//        } catch (NoSuchPaddingException e) {
-//            e.printStackTrace();
-//        } catch (InvalidKeyException e) {
-//            e.printStackTrace();
-//        }
-//        return null;
-//}
-//
+    public static String encryptJson(String keyName, String algorithm, String Json){
+        try {
+            PublicKey pubKey = loadPublicKey(keyName,algorithm);
+            String enJson = encryptMessage(pubKey,algorithm,Json).toString();
+            return enJson;
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
+        } catch (BadPaddingException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
 //    public static String decryptJson(String keyName, String algorithm, byte[] cipherMessage){
 //        try{
 //            ArrayList<Key> KeyPair = RSA.loadKeyPair(keyName, algorithm);

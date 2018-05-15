@@ -1,6 +1,5 @@
 package EZShare.server;
 
-import EZShare.RSA;
 import EZShare.message.*;
 import EZShare.Nodes;
 
@@ -12,6 +11,7 @@ import java.util.*;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
+import com.google.gson.reflect.TypeToken;
 
 
 import java.util.concurrent.ConcurrentHashMap;
@@ -404,21 +404,15 @@ public class WorkerThread extends Thread {
     }
 
     public void processKeyExchange(List<String> outputJsons, String JSON){
-        System.out.println("keylist class:"+ ExchangeKeyList.class);
-//        System.out.println(gson.fromJson(JSON,ExchangeKeyList.class));
-//        System.out.println("processKeyExchange");
-//        ExchangeKeyList exchangeKeyList = gson.fromJson(JSON,ExchangeKeyList.class);
-//        System.out.println("processKeyExchange1");
         try{
-//            Type exchangekeylisttype = new TypeToken<ConcurrentHashMap<String,PublicKey>>(){}.getType();
-//            ExchangeKeyList exchangeKeyList = gson.fromJson(JSON,exchangekeylisttype);
+//            System.out.println("input JSON:"+JSON);
             ExchangeKeyList exchangeKeyList = gson.fromJson(JSON,ExchangeKeyList.class);
-            System.out.println(exchangeKeyList);
             if (exchangeKeyList.getKeyList() == null || exchangeKeyList.getKeyList().isEmpty()) {
                 throw new JsonSyntaxException("missing keys");
             }
-            ConcurrentHashMap<String, PublicKey> inputKeyList = exchangeKeyList.getKeyList();
-            System.out.println(inputKeyList);
+//            ConcurrentHashMap<String, PublicKey> inputKeyList = exchangeKeyList.getKeyList();
+            ConcurrentHashMap<String, String> inputKeyList = exchangeKeyList.getKeyList();
+//            System.out.println("input key list:"+inputKeyList);
             if (exchangeKeyList.isValid()){
                 this.keyList.updateKeyList(inputKeyList);
                 Nodes.logger.log(Level.FINE, "{0} : keys added", this.ClientAddress);
@@ -429,6 +423,8 @@ public class WorkerThread extends Thread {
         } catch (JsonSyntaxException e) {
             Nodes.logger.log(Level.WARNING, "{0} : missing or invalid key list", this.ClientAddress);
             outputJsons.add(getErrorMessageJson("missing or invalid key list"));
+        }catch (Exception e){
+            e.printStackTrace();
         }
     }
     /*query done*/
@@ -704,7 +700,7 @@ public class WorkerThread extends Thread {
     private void sendBackMessage(List<String> jsons) {
         try {
             for (String json : jsons) {
-                System.out.println("sendbackJson:"+json);
+//                System.out.println("sendbackJson:"+json);
                 /* If json.length() == 0 (barely happens), do nothing at the moment. */
                 if (json.length() != 0) {
                     /* Let's assume that: If the string is not a json object, it must be a file URI. */
