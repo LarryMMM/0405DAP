@@ -93,7 +93,7 @@ public class RSA {
     public String getPrivateKey(){return this.pvtKey;}
 
 //    public RSA(){
-//        this.pubKey = (PublicKey) getKeyPair("RSA").get(0);
+//        this.pubKey = (PublicKey) getKeyPair("RSA").get(0);dww9'd9
 //        this.pvtKey = (PrivateKey)getKeyPair("RSA").get(1);
 //        saveKeyPair(getKeyPair("RSA"),id.toString().replace(":",","));
 //    }
@@ -136,7 +136,7 @@ public class RSA {
 //        }
 //    }
 
-    private static ArrayList<Key> getKeyPair(String algorithm){
+    private  ArrayList<Key> getKeyPair(String algorithm){
         try {
             ArrayList<Key> keyPair = new ArrayList<>();
             //RSA KEY GENERATION
@@ -157,7 +157,7 @@ public class RSA {
         }
     }
 //create RSA KEY
-    private static void saveKeyPair(ArrayList<Key> keyPair,String keyName){
+    private  void saveKeyPair(ArrayList<Key> keyPair,String keyName){
         try{
             Key pub = keyPair.get(0);
             Key pvt = keyPair.get(1);
@@ -179,7 +179,7 @@ public class RSA {
         }
     }
 //save RSA KEY
-    private static PrivateKey loadPrivateKey(String keyName,String algorithm){
+    public  PrivateKey loadPrivateKey(String keyName,String algorithm){
         try {
             Path keyFilePath = Paths.get(keyName + "pvt.txt");
             byte[] loadKeyByte = Files.readAllBytes(keyFilePath);
@@ -196,7 +196,7 @@ public class RSA {
             e.printStackTrace();
         }return null;
     }
-    private static PublicKey loadPublicKey(String keyName,String algorithm){
+    public   PublicKey loadPublicKey(String keyName,String algorithm){
         try {
             /* Read all the public key bytes */
             Path keyFilePath = Paths.get(keyName + "pub.txt");
@@ -214,7 +214,7 @@ public class RSA {
             e.printStackTrace();
         }return null;
     }
-    private static ArrayList<Key> loadKeyPair(String keyName,String algorithm){
+    private  ArrayList<Key> loadKeyPair(String keyName,String algorithm){
         try{
             ArrayList<Key> keyPair = new ArrayList<>();
             Path keyFilePath = Paths.get(keyName + "pvt.txt");
@@ -243,20 +243,20 @@ public class RSA {
         return null;
     }
 //load RSA KEY
-    public static byte[] encryptMessage(PublicKey pubKey,String algorithm, String message) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
+    public  byte[] encryptMessage(PublicKey pubKey,String algorithm, String message) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
         Cipher encryptCipher = Cipher.getInstance(algorithm);
         encryptCipher.init(Cipher.ENCRYPT_MODE,pubKey);
         return encryptCipher.doFinal(message.getBytes());
 //            System.err.println(cipherText);
     }
 //encrypt message
-    public static String decryptMessage(PrivateKey pvtKey,String algorithm,byte[] cipherMessage) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
+    public  String decryptMessage(PrivateKey pvtKey,String algorithm,byte[] cipherMessage) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
         Cipher decryptCipher = Cipher.getInstance(algorithm);
         decryptCipher.init(Cipher.PRIVATE_KEY, pvtKey);
         return new String(decryptCipher.doFinal(cipherMessage));
     }
 //decrypt message
-    private static void saveKeyPairText(ArrayList<Key> keyPair,String keyNameText){
+    private  void saveKeyPairText(ArrayList<Key> keyPair,String keyNameText){
         try {
             PublicKey pubKey = (PublicKey) keyPair.get(0);
             PrivateKey pvtKey = (PrivateKey) keyPair.get(1);
@@ -278,7 +278,7 @@ public class RSA {
         }
     }
 //save RSA KEY as txt
-    public static String getSignatureMessage(PrivateKey pvtKey,String algorithm,String message){
+    public  String getSignatureMessage(PrivateKey pvtKey,String algorithm,String message){
         try {
             Signature sign = Signature.getInstance(algorithm);
             sign.initSign(pvtKey);
@@ -286,7 +286,7 @@ public class RSA {
                 sign.update(message.getBytes());
             }
             System.err.println("generate RSA signature succeed!");
-            return (message+ sign.sign());
+            return (sign.sign().toString());
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
         } catch (SignatureException e) {
@@ -297,7 +297,7 @@ public class RSA {
         System.err.println("generate RSA signature failed!");
         return null;
     }
-    public static boolean verifySignatureMessage(PublicKey pubKey,String algorithm,String unsignedMessage,String signedMessage){
+    public  boolean verifySignatureMessage(PublicKey pubKey,String algorithm,String unsignedMessage,String signedMessage){
         try {
             Signature sign = Signature.getInstance(algorithm);
             sign.initVerify(pubKey);
@@ -314,7 +314,7 @@ public class RSA {
         }
         return false;
     }
-    public static void getSignatureFile(PrivateKey pvtKey,String algorithm,String fileName){
+    public  void getSignatureFile(PrivateKey pvtKey,String algorithm,String fileName){
         try {
             Signature sign = Signature.getInstance(algorithm);
             sign.initSign(pvtKey);
@@ -340,7 +340,7 @@ public class RSA {
         }
     }
 //create signature
-    public static boolean verifySignatureFile(PublicKey pubKey,String algorithm,String unsignedFileName,String signedFileName){
+    public  boolean verifySignatureFile(PublicKey pubKey,String algorithm,String unsignedFileName,String signedFileName){
         try {
             Signature sign = Signature.getInstance(algorithm);
             sign.initVerify(pubKey);
@@ -371,7 +371,7 @@ public class RSA {
 //    public static String decryptResponse(){
 //
 //    }
-    public static String encryptJson(String keyName, String algorithm, String Json){
+    public  String encryptJson(String keyName, String algorithm, String Json){
         try {
             PublicKey pubKey = loadPublicKey(keyName,algorithm);
             String enJson = encryptMessage(pubKey,algorithm,Json).toString();

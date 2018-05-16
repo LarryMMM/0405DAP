@@ -410,7 +410,6 @@ public class WorkerThread extends Thread {
             if (exchangeKeyList.getKeyList() == null || exchangeKeyList.getKeyList().isEmpty()) {
                 throw new JsonSyntaxException("missing keys");
             }
-//            ConcurrentHashMap<String, PublicKey> inputKeyList = exchangeKeyList.getKeyList();
             ConcurrentHashMap<String, String> inputKeyList = exchangeKeyList.getKeyList();
 //            System.out.println("input key list:"+inputKeyList);
             if (exchangeKeyList.isValid()){

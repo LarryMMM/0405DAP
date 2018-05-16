@@ -1,21 +1,25 @@
 package EZShare;
 
+import EZShare.encryptMessage.EncryptMessage;
 import EZShare.log.LogCustomFormatter;
 import EZShare.message.*;
 import EZShare.server.*;
 import com.google.gson.Gson;
 import org.apache.commons.cli.*;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 import javax.net.ServerSocketFactory;
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
 import java.security.PublicKey;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -32,7 +36,7 @@ public class Nodes {
     public static long EXCHANGE_PERIOD = 600000;
     public static boolean isUltraNode = false;
     public static final int TIME_OUT = 30000;//each connection time out
-    public static final String download_path = "./Downloads/lf1Fetch/";
+    public static final String download_path = "Downloads/lf1/";
     public static final int MAX_NODES_TO_EXPAND = 4;//maximum nodes for one hop to visit
     public static final int MAX_HOPS = 7;
     /* Data structures and utilities */
@@ -208,14 +212,20 @@ public class Nodes {
         QueryMessage queryMessage = new QueryMessage(resourceTemplate, true, MAX_HOPS);
         String JSON = gson.toJson(queryMessage);
 
-//        RSA target = new RSA(String.valueOf(socket.getRemoteSocketAddress()));//will check RSA keys
-//        String encryptedMessage =target.encryptJson(target.getID(),"RSA",JSON);
-//        target.getSignatureMessage(target.getPrivateKey());
-//        sendMessage(output, encryptedJson);
+//        String encryptedJson = gson.toJson(encryption(socket,JSON));
+//        System.out.println(encryptedJson);
+
+//        sendMessage(output,encryptedJson);
 
         sendMessage(output, JSON);
-
+//        String encryptedResponseJson = input.readUTF();
+//        EncryptMessage responseJson = gson.fromJson(encryptedResponseJson,EncryptMessage.class);
+//        String response = decryption(socket,responseJson);
+//        System.out.println(encryptedResponseJson);
         String response = input.readUTF();
+
+
+
 
         //receive response
         if (response.contains("success")) {
@@ -425,7 +435,7 @@ public class Nodes {
                 if (!download_directory.exists()) {
                     download_directory.mkdir();
                 }
-//                System.out.println("downloadpath"+download_path);
+                System.out.println("downloadpath"+download_path);
                 //create file
                 RandomAccessFile randomAccessFile = new RandomAccessFile(download_path + name, "rw");
 
@@ -718,6 +728,45 @@ public class Nodes {
         }
     }
 
+    private static EncryptMessage encryption(Socket socket,String JSON){
+        RSA target = new RSA(String.valueOf(socket.getRemoteSocketAddress()));//will check RSA keys
+        Base64.Encoder encoder = Base64.getEncoder();//java provided
+        String targetKeyName = target.getID().replace(":", ",");
+        String encryptedMessage =encoder.encodeToString(target.encryptJson(targetKeyName,"RSA",JSON).getBytes());
+        PrivateKey pvtKeyTarget = target.loadPrivateKey(targetKeyName,"RSA");
+        String signature =encoder.encodeToString(target.getSignatureMessage(pvtKeyTarget,"SHA256withRSA",encryptedMessage).getBytes()) ;
+        EncryptMessage encryptedCommand = new EncryptMessage(encryptedMessage,signature,targetKeyName);
+        return encryptedCommand;
+    }
+    private static String decryption(Socket socket,EncryptMessage encryptedJSON){
+        RSA target = new RSA(String.valueOf(socket.getRemoteSocketAddress()));//will check RSA keys
+        String targetKeyName = target.getID().replace(":", ",");
+        PrivateKey pvtKeyTarget = target.loadPrivateKey(targetKeyName,"RSA");
+        String unsignedEncryptedMessage = encryptedJSON.getEncryptedMessage();
+        String signature = encryptedJSON.getSignature();
+        String sender = encryptedJSON.getSender();
+
+        PublicKey pubKeySender = target.loadPublicKey(sender,"RSA");
+        if (target.verifySignatureMessage(pubKeySender,"SHA256withRSA",unsignedEncryptedMessage,signature))
+        {
+            try {
+                String unsignedMessage = target.decryptMessage(pvtKeyTarget,"RSA",unsignedEncryptedMessage.getBytes());
+                return unsignedMessage;
+            } catch (NoSuchPaddingException e) {
+                e.printStackTrace();
+            } catch (NoSuchAlgorithmException e) {
+                e.printStackTrace();
+            } catch (InvalidKeyException e) {
+                e.printStackTrace();
+            } catch (BadPaddingException e) {
+                e.printStackTrace();
+            } catch (IllegalBlockSizeException e) {
+                e.printStackTrace();
+            }return "decrypt message failed";
+        }else{ return "invalid signature";}
+
+
+    }
     public static void main(String[] args) {
         logger.info("Starting the EZShare F2F system and initialise node");
 
